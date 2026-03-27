@@ -1,0 +1,7 @@
+streamlit==1.44.1
+SQLAlchemy==2.0.39
+pandas==2.2.3
+plotly==6.0.1
+pydantic==2.11.3
+scikit-learn==1.6.1
+joblib==1.4.2
