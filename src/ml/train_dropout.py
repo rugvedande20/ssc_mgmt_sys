@@ -128,37 +128,39 @@ def build_preprocessor() -> ColumnTransformer:
 
 def build_synthetic_dropout_dataset(rows: int = 1400, random_state: int = 42) -> pd.DataFrame:
     rng = np.random.default_rng(random_state)
-    departments = np.array(["Computer Science", "IT", "Electronics", "Mechanical", "Commerce"])
+    from config.school_context import SCHOOL_FOCUS_AREAS_FOR_ML
+
+    streams = np.array(SCHOOL_FOCUS_AREAS_FOR_ML)
     income_bands = np.array(["Low", "Middle", "Upper Middle", "High"])
-    parental_education = np.array(["School", "Graduate", "Postgraduate"])
+    parental_education = np.array(["Up to Class 10", "Graduate", "Postgraduate"])
     yes_no = np.array(["Yes", "No"])
     internet_levels = np.array(["Yes", "No", "Limited"])
 
     df = pd.DataFrame(
         {
-            "attendance_percentage": rng.normal(78, 12, rows).clip(35, 100),
-            "cgpa": rng.normal(7.1, 1.1, rows).clip(3.5, 9.9),
-            "internal_marks": rng.normal(71, 13, rows).clip(30, 98),
-            "backlog_count": rng.poisson(1.1, rows).clip(0, 8),
+            "attendance_percentage": rng.normal(82, 11, rows).clip(40, 100),
+            "cgpa": rng.normal(68, 14, rows).clip(35, 98),
+            "internal_marks": rng.normal(66, 15, rows).clip(30, 98),
+            "backlog_count": rng.poisson(0.9, rows).clip(0, 6),
             "fee_pending": rng.choice(yes_no, rows, p=[0.28, 0.72]),
             "scholarship_status": rng.choice(yes_no, rows, p=[0.33, 0.67]),
             "extracurricular_participation": rng.choice(yes_no, rows, p=[0.55, 0.45]),
             "disciplinary_issues": rng.poisson(0.35, rows).clip(0, 5),
             "engagement_score": rng.normal(6.3, 1.8, rows).clip(1, 10),
             "stress_level": rng.normal(5.2, 1.9, rows).clip(1, 10),
-            "age": rng.integers(17, 25, rows),
-            "semester": rng.integers(1, 9, rows),
+            "age": rng.integers(11, 17, rows),
+            "semester": rng.integers(6, 11, rows),
             "family_income_band": rng.choice(income_bands, rows, p=[0.32, 0.38, 0.2, 0.1]),
             "parental_education": rng.choice(parental_education, rows, p=[0.38, 0.42, 0.2]),
-            "travel_distance_km": rng.normal(10, 7, rows).clip(0, 45),
+            "travel_distance_km": rng.normal(8, 6, rows).clip(0, 35),
             "internet_access": rng.choice(internet_levels, rows, p=[0.78, 0.08, 0.14]),
-            "department": rng.choice(departments, rows),
+            "department": rng.choice(streams, rows),
         }
     )
 
     risk_signal = (
         (100 - df["attendance_percentage"]) * 0.055
-        + (8.8 - df["cgpa"]) * 0.85
+        + (72 - df["cgpa"]) * 0.09
         + df["backlog_count"] * 0.45
         + (df["fee_pending"] == "Yes").astype(float) * 0.85
         + (df["scholarship_status"] == "No").astype(float) * 0.18

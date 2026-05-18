@@ -4,7 +4,7 @@ import pandas as pd
 from src.db.database import get_db_session
 from src.services.dropout_service import (
     get_dropout_model_status,
-    list_recent_predictions,
+    list_latest_predictions_per_student,
     run_predictions_for_latest_records,
     train_dropout_model,
 )
@@ -14,7 +14,9 @@ from ui.components.charts import risk_distribution_chart
 
 def render() -> None:
     st.title("Dropout Analysis")
-    st.caption("Train the baseline model once, then score the latest academic record for each student.")
+    st.caption(
+        "Train the baseline model once, then score the latest school record for each Class 6–10 student."
+    )
 
     model_status = get_dropout_model_status()
     status_col, action_col = st.columns((1.4, 1))
@@ -52,14 +54,14 @@ def render() -> None:
             with get_db_session() as session:
                 results = run_predictions_for_latest_records(session)
             if results:
-                st.success(f"Generated {len(results)} predictions.")
+                st.success(f"Generated {len(results)} new predictions (history is kept; dashboards use latest per student).")
             else:
                 st.warning("No student records were available for prediction.")
             st.rerun()
 
     with get_db_session() as session:
         latest_records = list_students_with_latest_records(session)
-        recent_predictions = list_recent_predictions(session, limit=50)
+        latest_predictions = list_latest_predictions_per_student(session, limit=100)
 
     st.divider()
     st.subheader("Prediction Candidates")
@@ -69,11 +71,18 @@ def render() -> None:
         st.info("Add academic records in the upload page to make students eligible for prediction.")
 
     st.divider()
-    st.subheader("Recent Predictions")
-    if recent_predictions:
-        recent_df = pd.DataFrame(recent_predictions)
-        st.dataframe(recent_df, use_container_width=True, hide_index=True)
-        chart = risk_distribution_chart(recent_predictions)
+    st.subheader("Latest Prediction Per Student")
+    if latest_predictions:
+        recent_df = pd.DataFrame(latest_predictions)
+        display_columns = ["student_name", "username", "risk_score", "risk_level", "predicted_at"]
+        st.dataframe(recent_df[display_columns], use_container_width=True, hide_index=True)
+
+        with st.expander("Risk explanations by student"):
+            for row in latest_predictions:
+                st.markdown(f"**{row['student_name']}** — {row['risk_level']} ({row['risk_score']}%)")
+                st.caption(row["top_factors"])
+
+        chart = risk_distribution_chart(latest_predictions)
         if chart:
             st.plotly_chart(chart, use_container_width=True, config={"displayModeBar": False})
     else:
