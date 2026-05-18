@@ -17,6 +17,7 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_by_admin_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
 
     student_profile: Mapped["StudentProfile"] = relationship(back_populates="user", uselist=False)
     academic_records: Mapped[list["AcademicRecord"]] = relationship(back_populates="student")

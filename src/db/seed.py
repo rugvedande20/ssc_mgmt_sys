@@ -33,41 +33,41 @@ def seed_demo_data(session) -> None:
     session.add(
         StudentProfile(
             user_id=student.id,
-            age=20,
+            age=14,
             gender="Male",
-            department="Computer Science",
-            semester=6,
+            department="Ryan International School (CBSE)",
+            semester=8,
             family_income_band="Middle",
             parental_education="Graduate",
-            travel_distance_km=7.5,
+            travel_distance_km=4.0,
             internet_access="Yes",
-            interests_summary="Interested in analytics, coding, and problem solving.",
-            strengths_summary="Consistent learner with strong logical reasoning.",
+            interests_summary="Science club, coding, cricket, and quiz competitions.",
+            strengths_summary="Strong in Maths and Science; curious and consistent with homework.",
         )
     )
 
     session.add(
         AcademicRecord(
             student_id=student.id,
-            attendance_percentage=84.0,
-            cgpa=8.1,
-            internal_marks=76.0,
+            attendance_percentage=88.0,
+            cgpa=74.0,
+            internal_marks=74.0,
             backlog_count=0,
             fee_pending="No",
             scholarship_status="No",
             extracurricular_participation="Yes",
             disciplinary_issues=0,
-            engagement_score=7.9,
-            stress_level=4.1,
+            engagement_score=7.8,
+            stress_level=4.0,
         )
     )
 
     session.add(
         DropoutPrediction(
             student_id=student.id,
-            risk_score=0.18,
+            risk_score=0.16,
             risk_level="Low",
-            top_factors="Stable attendance, no backlogs, and healthy academic consistency.",
+            top_factors="Good attendance, no subjects below passing level, and steady participation in class.",
         )
     )
 
@@ -85,7 +85,7 @@ def seed_demo_data(session) -> None:
                 }
             ),
             top_codes="Investigative, Social, Enterprising",
-            summary="You are drawn toward analytical work with meaningful problem solving and collaborative impact.",
+            summary="You are drawn toward analytical subjects, teamwork, and activities where you can learn and help others.",
         )
     )
 
@@ -93,23 +93,23 @@ def seed_demo_data(session) -> None:
         [
             CareerRecommendation(
                 student_id=student.id,
-                career_name="Data Analyst",
-                match_score=88.0,
-                rationale="Strong analytical interest, consistent academics, and a good fit for data-driven roles.",
-                skill_gap=json.dumps(["Advanced SQL", "Dashboard storytelling", "Statistics practice"]),
-                roadmap="Month 1-2: strengthen SQL and Excel. Month 3-4: build dashboard projects. Month 5-6: learn Python analytics stack and publish portfolio work.",
+                career_name="App & Game Creator",
+                match_score=86.0,
+                rationale="Strong logical interests and curiosity about technology suit creative digital careers you can explore early.",
+                skill_gap=json.dumps(["Block-based coding", "Logical thinking", "English communication"]),
+                roadmap="Class 6–8: Scratch or block coding clubs. Class 9–10: strengthen Maths, join school computer club, build a small science or coding project.",
                 certifications=json.dumps(
-                    ["Google Data Analytics", "Microsoft Power BI Data Analyst", "IBM Data Science Fundamentals"]
+                    ["Code.org / Scratch certificates", "School computer club modules", "Local science fair participation"]
                 ),
             ),
             CareerRecommendation(
                 student_id=student.id,
-                career_name="Business Intelligence Analyst",
-                match_score=82.0,
-                rationale="Balanced investigative and enterprising traits align with insight generation and business reporting.",
-                skill_gap=json.dumps(["Power BI", "Business metrics", "Stakeholder communication"]),
-                roadmap="Build KPI dashboards, practice data storytelling, and complete one business case project each month.",
-                certifications=json.dumps(["PL-300 Power BI", "Tableau Desktop Specialist"]),
+                career_name="Doctor / Nurse (explore health sciences)",
+                match_score=80.0,
+                rationale="Investigative and social interests fit caring professions—worth exploring through science subjects and awareness activities.",
+                skill_gap=json.dumps(["Biology basics", "Study habits", "Curiosity about the human body"]),
+                roadmap="Do well in Science, join health awareness camps or science exhibitions, and read about how hospitals and research labs work.",
+                certifications=json.dumps(["Science Olympiad foundation (school level)", "First-aid awareness workshops"]),
             ),
         ]
     )

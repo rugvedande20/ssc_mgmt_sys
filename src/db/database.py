@@ -59,3 +59,17 @@ def get_db_session() -> Iterator[Session]:
 
 def get_database_mode() -> str:
     return _DATABASE_MODE
+
+
+def apply_schema_patches(engine) -> None:
+    """Add columns introduced after first deploy (SQLite has no automatic migrations)."""
+    patches = [
+        "ALTER TABLE users ADD COLUMN created_by_admin_id INTEGER REFERENCES users(id)",
+    ]
+    with engine.connect() as connection:
+        with connection.begin():
+            for statement in patches:
+                try:
+                    connection.execute(text(statement))
+                except OperationalError:
+                    pass

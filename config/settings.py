@@ -5,7 +5,7 @@ from sqlalchemy import URL
 
 
 class AppSettings(BaseModel):
-    app_name: str = "Student Success and Career Guidance Platform"
+    app_name: str = "Class 6–10 Student Success & Career Guidance"
     app_version: str = "0.1.0"
     base_dir: Path = Path(__file__).resolve().parent.parent
     data_dir: Path = base_dir / "data"

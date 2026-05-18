@@ -5,18 +5,19 @@ from typing import Any
 from sqlalchemy import desc, func, select
 
 from src.db.models import AcademicRecord, DropoutPrediction, StudentProfile, User
-from src.ml.predict_dropout import model_exists, predict_dropout_batch
-from src.ml.train_dropout import train_and_save_dropout_model
 
 
 def train_dropout_model() -> dict:
+    from src.ml.train_dropout import train_and_save_dropout_model
+
     return train_and_save_dropout_model()
 
 
 def get_dropout_model_status() -> dict[str, Any]:
+    from src.ml.predict_dropout import load_model_bundle, model_exists
+
     if not model_exists():
         return {"available": False}
-    from src.ml.predict_dropout import load_model_bundle
 
     _, metadata = load_model_bundle()
     return {"available": True, **metadata}
@@ -73,6 +74,8 @@ def build_prediction_candidates(session) -> list[dict[str, Any]]:
 
 
 def run_predictions_for_latest_records(session) -> list[dict[str, Any]]:
+    from src.ml.predict_dropout import predict_dropout_batch
+
     candidates = build_prediction_candidates(session)
     if not candidates:
         return []
@@ -117,7 +120,7 @@ def run_predictions_for_latest_records(session) -> list[dict[str, Any]]:
         results.append(
             {
                 "student_name": candidate["student_name"],
-                "department": candidate["department"] or "-",
+                "school_or_stream": candidate["department"] or "-",
                 "risk_score": round(prediction["risk_score"] * 100, 1),
                 "risk_level": prediction["risk_level"],
                 "top_factors": explanation,
@@ -148,14 +151,57 @@ def list_recent_predictions(session, limit: int = 50) -> list[dict[str, Any]]:
     ]
 
 
+def list_latest_predictions_per_student(session, limit: int = 100) -> list[dict[str, Any]]:
+    latest_prediction_subquery = (
+        select(
+            DropoutPrediction.student_id,
+            DropoutPrediction.id,
+            func.row_number()
+            .over(partition_by=DropoutPrediction.student_id, order_by=DropoutPrediction.predicted_at.desc())
+            .label("prediction_rank"),
+        )
+        .subquery()
+    )
+
+    rows = session.execute(
+        select(
+            User.id,
+            User.full_name,
+            User.username,
+            DropoutPrediction.risk_score,
+            DropoutPrediction.risk_level,
+            DropoutPrediction.top_factors,
+            DropoutPrediction.predicted_at,
+        )
+        .join(latest_prediction_subquery, latest_prediction_subquery.c.student_id == User.id)
+        .join(DropoutPrediction, DropoutPrediction.id == latest_prediction_subquery.c.id)
+        .where(User.role == "student", latest_prediction_subquery.c.prediction_rank == 1)
+        .order_by(desc(DropoutPrediction.risk_score))
+        .limit(limit)
+    ).all()
+
+    return [
+        {
+            "student_id": row.id,
+            "student_name": row.full_name,
+            "username": row.username,
+            "risk_score": round(row.risk_score * 100, 1),
+            "risk_level": row.risk_level,
+            "top_factors": row.top_factors,
+            "predicted_at": row.predicted_at.strftime("%Y-%m-%d %H:%M"),
+        }
+        for row in rows
+    ]
+
+
 def build_explanation(candidate: dict[str, Any], risk_level: str) -> str:
     factors: list[str] = []
     if (candidate.get("attendance_percentage") or 0) < 70:
         factors.append("low attendance")
-    if (candidate.get("cgpa") or 0) < 6.0:
-        factors.append("weak CGPA")
+    if (candidate.get("cgpa") or 0) < 50:
+        factors.append("low overall marks")
     if (candidate.get("backlog_count") or 0) >= 2:
-        factors.append("multiple backlogs")
+        factors.append("multiple subjects below passing level")
     if candidate.get("fee_pending") == "Yes":
         factors.append("pending fees")
     if (candidate.get("engagement_score") or 10) < 5.0:
@@ -167,6 +213,6 @@ def build_explanation(candidate: dict[str, Any], risk_level: str) -> str:
 
     if not factors:
         if risk_level == "Low":
-            return "Consistent academic indicators and healthy engagement lower the current dropout risk."
-        return "Mixed indicators suggest moderate risk, though no single severe academic trigger is present."
+            return "Steady attendance, acceptable marks, and healthy engagement lower the risk of leaving school early."
+        return "Mixed school indicators suggest moderate risk, though no single severe trigger stands out."
     return "Key factors: " + ", ".join(factors[:4]) + "."

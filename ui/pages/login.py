@@ -8,7 +8,7 @@ from src.services.user_service import build_user_payload
 
 def render() -> None:
     st.title("Login")
-    st.caption("Role-based access for students and admins.")
+    st.caption("Sign in as a school teacher/admin or as a student (Class 6–10).")
 
     with st.form("login_form", clear_on_submit=False):
         username = st.text_input("Username")
@@ -18,10 +18,19 @@ def render() -> None:
     if submitted:
         with get_db_session() as session:
             user = authenticate_user(session, username=username.strip(), password=password)
-        if not user:
+            user_payload = build_user_payload(user) if user else None
+        if not user_payload:
             st.error("Invalid credentials. Please try again.")
             return
 
-        login_user(build_user_payload(user))
+        login_user(user_payload)
         st.success("Login successful.")
         st.rerun()
+
+    with st.expander("Demo credentials"):
+        st.markdown(
+            """
+            - **Admin:** `admin` / `Admin@123`
+            - **Student:** `student1` / `Student@123`
+            """
+        )
