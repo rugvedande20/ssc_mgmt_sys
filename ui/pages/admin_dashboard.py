@@ -7,6 +7,7 @@ from src.services.dropout_service import list_latest_predictions_per_student
 from src.services.user_service import get_dashboard_counts
 from ui.components.charts import risk_distribution_chart
 from ui.components.layout import section, show_plotly_chart
+from ui.components.risk_display import render_risk_explanations_section
 from ui.components.tables import show_dataframe
 
 
@@ -46,10 +47,6 @@ def render(current_user: dict) -> None:
                     ],
                     columns=["student_name", "risk_score", "risk_level", "predicted_at"],
                 )
-                with st.expander("Risk explanations"):
-                    for row in predictions:
-                        st.markdown(f"**{row['student_name']}** — {row['risk_level']} ({row['risk_score']}%)")
-                        st.caption(row["top_factors"])
             else:
                 st.info("No predictions yet. Upload data, train the model, and run predictions.")
 
@@ -62,6 +59,13 @@ def render(current_user: dict) -> None:
                 )
             else:
                 st.info("No students yet. Create accounts under Student Management.")
+
+    if predictions:
+        with section(
+            "Risk explanations",
+            "Factors behind each student's latest risk band.",
+        ):
+            render_risk_explanations_section(predictions)
 
     chart = risk_distribution_chart(predictions if predictions else [])
     with section("Risk distribution", "Count of students in each risk band."):

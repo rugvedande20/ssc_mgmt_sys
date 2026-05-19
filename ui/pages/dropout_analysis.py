@@ -10,6 +10,7 @@ from src.services.dropout_service import (
 from ui.components.charts import risk_distribution_chart
 from ui.components.layout import section, show_plotly_chart
 from ui.components.model_evaluation import render_model_metrics_table
+from ui.components.risk_display import render_risk_explanations_section
 from ui.components.tables import show_dataframe
 
 
@@ -54,23 +55,21 @@ def render() -> None:
     with get_db_session() as session:
         latest_predictions = list_latest_predictions_per_student(session, limit=100)
 
-    with section("Latest predictions", "One row per student — most recent run."):
-        if not latest_predictions:
-            st.info("No predictions yet. Train the model and run predictions.")
-            return
+    if not latest_predictions:
+        st.info("No predictions yet. Train the model and run predictions.")
+        return
 
-        table_col, chart_col = st.columns((1.35, 1))
-        with table_col:
-            show_dataframe(
-                latest_predictions,
-                columns=["student_name", "username", "risk_score", "risk_level", "predicted_at"],
-            )
-            with st.expander("Risk explanations"):
-                for row in latest_predictions:
-                    st.markdown(f"**{row['student_name']}** — {row['risk_level']} ({row['risk_score']}%)")
-                    st.caption(row["top_factors"])
+    with section("Latest predictions", "Summary table and risk distribution."):
+        show_dataframe(
+            latest_predictions,
+            columns=["student_name", "username", "risk_score", "risk_level", "predicted_at"],
+        )
+        chart = risk_distribution_chart(latest_predictions)
+        if chart:
+            show_plotly_chart(chart, key="dropout_analysis_risk_chart")
 
-        with chart_col:
-            chart = risk_distribution_chart(latest_predictions)
-            if chart:
-                show_plotly_chart(chart, key="dropout_analysis_risk_chart")
+    with section(
+        "Risk explanations",
+        "Readable breakdown of factors for each student (not hidden in a dropdown).",
+    ):
+        render_risk_explanations_section(latest_predictions)

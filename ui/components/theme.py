@@ -104,6 +104,66 @@ def inject_app_theme() -> None:
       div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
         color: #1d4ed8 !important;
       }
+
+      /* Inputs — subtle light grey (fixes invisible fields on light backgrounds) */
+      .stTextInput input,
+      .stTextArea textarea,
+      .stNumberInput input,
+      div[data-testid="stDateInput"] input,
+      div[data-testid="stTimeInput"] input {
+        background-color: #f1f5f9 !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 8px !important;
+        color: #1e293b !important;
+        caret-color: #1e293b !important;
+      }
+
+      .stTextInput input:focus,
+      .stTextArea textarea:focus,
+      .stNumberInput input:focus,
+      div[data-testid="stDateInput"] input:focus {
+        border-color: #94a3b8 !important;
+        box-shadow: 0 0 0 1px #e2e8f0 !important;
+        background-color: #f8fafc !important;
+      }
+
+      /* Selectbox, multiselect, combobox */
+      div[data-baseweb="select"] > div,
+      div[data-baseweb="input"] > div {
+        background-color: #f1f5f9 !important;
+        border-color: #d1d5db !important;
+        color: #1e293b !important;
+      }
+
+      div[data-baseweb="select"] span,
+      div[data-baseweb="input"] input {
+        color: #1e293b !important;
+      }
+
+      /* File uploader dropzone */
+      div[data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] {
+        background-color: #f1f5f9 !important;
+        border: 1px dashed #cbd5e1 !important;
+      }
+
+      /* Dataframe / table filter inputs */
+      div[data-testid="stDataFrame"] input {
+        background-color: #f1f5f9 !important;
+        color: #1e293b !important;
+      }
+
+      /* Search & labels above fields */
+      label[data-testid="stWidgetLabel"] {
+        color: #475569 !important;
+        font-weight: 500 !important;
+      }
+
+      /* Placeholder text */
+      .stTextInput input::placeholder,
+      .stTextArea textarea::placeholder {
+        color: #94a3b8 !important;
+        opacity: 1 !important;
+      }
     </style>
     """,
     unsafe_allow_html=True,
