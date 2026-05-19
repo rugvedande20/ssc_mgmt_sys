@@ -5,6 +5,7 @@ from config.school_context import FUTURE_SCOPE_NOTE, GRADE_LABELS, PROFILE_FIELD
 from src.db.database import get_db_session
 from src.services.student_service import create_student_user, get_student_overview, list_students
 from src.utils.helpers import profile_completeness_percent
+from ui.components.tables import show_dataframe
 
 
 def _render_student_overview(overview: dict) -> None:
@@ -67,7 +68,7 @@ def _render_student_overview(overview: dict) -> None:
 
 
 def render(current_user: dict) -> None:
-    st.title("Student Management")
+    st.header("Student Management")
     st.caption(f"Create and review student accounts for Class {TARGET_GRADE_MIN}–{TARGET_GRADE_MAX}. {FUTURE_SCOPE_NOTE}")
 
     grade_options = list(range(TARGET_GRADE_MIN, TARGET_GRADE_MAX + 1))
@@ -117,7 +118,7 @@ def render(current_user: dict) -> None:
         )
 
     if students:
-        st.dataframe(students, use_container_width=True, hide_index=True)
+        show_dataframe(students, columns=["full_name", "username", "email", "school", "class"])
     else:
         st.info("No students found for the current search.")
 

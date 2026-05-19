@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 
 from src.db.database import get_db_session
 from src.services.dropout_service import (
@@ -8,82 +7,70 @@ from src.services.dropout_service import (
     run_predictions_for_latest_records,
     train_dropout_model,
 )
-from src.services.student_service import list_students_with_latest_records
 from ui.components.charts import risk_distribution_chart
+from ui.components.layout import section, show_plotly_chart
+from ui.components.model_evaluation import render_model_metrics_table
+from ui.components.tables import show_dataframe
 
 
 def render() -> None:
-    st.title("Dropout Analysis")
-    st.caption(
-        "Train the baseline model once, then score the latest school record for each Class 6–10 student."
-    )
+    st.header("Dropout Analysis")
+    st.caption("Train the model once, then score the latest record for each Class 6–10 student.")
 
     model_status = get_dropout_model_status()
-    status_col, action_col = st.columns((1.4, 1))
-    with status_col:
-        if model_status.get("available"):
-            st.success("Dropout model available")
-            metrics_df = pd.DataFrame(
-                [
-                    {
-                        "Accuracy": model_status.get("accuracy"),
-                        "F1 Score": model_status.get("f1_score"),
-                        "ROC AUC": model_status.get("roc_auc"),
-                        "Train Size": model_status.get("train_size"),
-                        "Test Size": model_status.get("test_size"),
-                    }
-                ]
-            )
-            st.dataframe(metrics_df, use_container_width=True, hide_index=True)
-            st.caption(f"Last trained: {model_status.get('trained_at', '-')}")
-            st.caption("Initial model uses synthetic baseline data until an institutional training dataset is added.")
-        else:
-            st.warning("No dropout model has been trained yet.")
 
-    with action_col:
-        st.subheader("Actions")
-        if st.button("Train Baseline Model", use_container_width=True):
-            with st.spinner("Training dropout model..."):
-                metrics = train_dropout_model()
-            st.success("Model trained successfully.")
-            st.json(metrics)
-            st.rerun()
-
-        predict_disabled = not model_status.get("available")
-        if st.button("Run Predictions For Latest Records", disabled=predict_disabled, use_container_width=True):
-            with get_db_session() as session:
-                results = run_predictions_for_latest_records(session)
-            if results:
-                st.success(f"Generated {len(results)} new predictions (history is kept; dashboards use latest per student).")
+    with section("Model & actions", "Train on baseline data, then score your uploaded records."):
+        status_col, action_col = st.columns((1.35, 1))
+        with status_col:
+            if model_status.get("available"):
+                st.success("Model ready")
+                render_model_metrics_table(model_status)
+                st.caption(f"Last trained: {model_status.get('trained_at', '-')}")
             else:
-                st.warning("No student records were available for prediction.")
-            st.rerun()
+                st.warning("No model trained yet.")
+
+        with action_col:
+            if st.button("Train baseline model", use_container_width=True, key="dropout_train"):
+                with st.spinner("Training…"):
+                    train_dropout_model()
+                st.success("Training complete.")
+                st.rerun()
+
+            predict_disabled = not model_status.get("available")
+            if st.button(
+                "Run predictions",
+                disabled=predict_disabled,
+                use_container_width=True,
+                key="dropout_predict",
+            ):
+                with get_db_session() as session:
+                    results = run_predictions_for_latest_records(session)
+                if results:
+                    st.success(f"Scored {len(results)} student(s).")
+                else:
+                    st.warning("No records available to score.")
+                st.rerun()
 
     with get_db_session() as session:
-        latest_records = list_students_with_latest_records(session)
         latest_predictions = list_latest_predictions_per_student(session, limit=100)
 
-    st.divider()
-    st.subheader("Prediction Candidates")
-    if latest_records:
-        st.dataframe(pd.DataFrame(latest_records), use_container_width=True, hide_index=True)
-    else:
-        st.info("Add academic records in the upload page to make students eligible for prediction.")
+    with section("Latest predictions", "One row per student — most recent run."):
+        if not latest_predictions:
+            st.info("No predictions yet. Train the model and run predictions.")
+            return
 
-    st.divider()
-    st.subheader("Latest Prediction Per Student")
-    if latest_predictions:
-        recent_df = pd.DataFrame(latest_predictions)
-        display_columns = ["student_name", "username", "risk_score", "risk_level", "predicted_at"]
-        st.dataframe(recent_df[display_columns], use_container_width=True, hide_index=True)
+        table_col, chart_col = st.columns((1.35, 1))
+        with table_col:
+            show_dataframe(
+                latest_predictions,
+                columns=["student_name", "username", "risk_score", "risk_level", "predicted_at"],
+            )
+            with st.expander("Risk explanations"):
+                for row in latest_predictions:
+                    st.markdown(f"**{row['student_name']}** — {row['risk_level']} ({row['risk_score']}%)")
+                    st.caption(row["top_factors"])
 
-        with st.expander("Risk explanations by student"):
-            for row in latest_predictions:
-                st.markdown(f"**{row['student_name']}** — {row['risk_level']} ({row['risk_score']}%)")
-                st.caption(row["top_factors"])
-
-        chart = risk_distribution_chart(latest_predictions)
-        if chart:
-            st.plotly_chart(chart, use_container_width=True, config={"displayModeBar": False})
-    else:
-        st.info("No predictions yet. Train the model and run predictions to populate this view.")
+        with chart_col:
+            chart = risk_distribution_chart(latest_predictions)
+            if chart:
+                show_plotly_chart(chart, key="dropout_analysis_risk_chart")
