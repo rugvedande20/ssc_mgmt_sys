@@ -2,7 +2,7 @@ import streamlit as st
 
 
 def render() -> None:
-    st.title("Interventions")
+    st.header("Interventions")
     st.caption("Log counseling notes and track actions taken for at-risk students.")
 
     st.info(

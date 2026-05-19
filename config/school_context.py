@@ -93,6 +93,14 @@ ACADEMIC_CSV_ALIASES: dict[str, str] = {
     "failed_subjects": "backlog_count",
     "class_grade": "semester",
     "grade": "semester",
+    "firstname": "first_name",
+    "first_name": "first_name",
+    "fname": "first_name",
+    "lastname": "last_name",
+    "last_name": "last_name",
+    "lname": "last_name",
+    "school": "school_name",
+    "school_name": "school_name",
     # Legacy internal names (still accepted)
     "attendance_percentage": "attendance_percentage",
     "cgpa": "cgpa",
@@ -105,9 +113,8 @@ ACADEMIC_CSV_ALIASES: dict[str, str] = {
     "engagement_score": "engagement_score",
 }
 
-# Internal DB columns required after normalization
-ACADEMIC_DB_COLUMNS = [
-    "student_username",
+# Academic fields stored per import row (identity columns validated separately)
+ACADEMIC_RECORD_DB_COLUMNS = [
     "attendance_percentage",
     "cgpa",
     "internal_marks",
@@ -119,6 +126,9 @@ ACADEMIC_DB_COLUMNS = [
     "engagement_score",
     "stress_level",
 ]
+
+# Backward-compatible alias used in import validation
+ACADEMIC_DB_COLUMNS = ACADEMIC_RECORD_DB_COLUMNS
 
 # DB column -> preferred school CSV header (for error messages)
 DB_TO_SCHOOL_CSV_HEADER = {v: k for k, v in ACADEMIC_CSV_ALIASES.items() if k in SCHOOL_ACADEMIC_CSV_COLUMNS}

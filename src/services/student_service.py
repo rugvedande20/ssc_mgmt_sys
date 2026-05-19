@@ -16,9 +16,17 @@ from src.services.student_credentials import (
 from config.school_context import (
     ACADEMIC_CSV_ALIASES,
     ACADEMIC_DB_COLUMNS,
+    ACADEMIC_RECORD_DB_COLUMNS,
     DB_TO_SCHOOL_CSV_HEADER,
     SCHOOL_ACADEMIC_CSV_COLUMNS,
+    format_class,
 )
+
+
+def _format_class_label(grade: int | None) -> str:
+    if grade is None:
+        return "—"
+    return format_class(int(grade))
 from src.db.models import AcademicRecord, CareerRecommendation, DropoutPrediction, PsychometricAttempt, StudentProfile, User
 
 
@@ -168,7 +176,7 @@ def list_students(
             "username": row.username,
             "email": row.email,
             "school": row.department or "-",
-            "class": row.semester if row.semester is not None else "-",
+            "class": _format_class_label(row.semester),
         }
         for row in rows
     ]
@@ -274,7 +282,7 @@ def list_students_with_latest_records(session) -> list[dict[str, Any]]:
             "student_name": row.full_name,
             "username": row.username,
             "school": row.department or "-",
-            "class": row.semester if row.semester is not None else "-",
+            "class": _format_class_label(row.semester),
             "attendance_percentage": row.attendance_percentage,
             "overall_marks_pct": row.cgpa,
             "subjects_below_passing": row.backlog_count,
@@ -432,23 +440,77 @@ def _optional_profile_fields_from_row(row: dict[str, Any]) -> dict[str, Any]:
     return profile
 
 
+def _get_or_create_student_for_import(
+    session,
+    row: dict[str, Any],
+    admin_user_id: int,
+    login_to_student_id: dict[str, int],
+    import_batch_cache: dict[str, int],
+) -> tuple[int, dict[str, str] | None]:
+    """Return student id and credential payload when a new account is created."""
+    first, last, full_name = resolve_student_name(row)
+    base_username = build_login_username(first, last)
+    csv_slug = str(row.get("student_username", "")).strip().lower()
+
+    student_id = import_batch_cache.get(base_username)
+    if not student_id and csv_slug:
+        student_id = login_to_student_id.get(csv_slug)
+    if not student_id:
+        student_id = login_to_student_id.get(base_username)
+
+    if student_id:
+        import_batch_cache[base_username] = student_id
+        if profile_fields := _optional_profile_fields_from_row(row):
+            upsert_student_profile(session, student_id, profile_fields)
+        return student_id, None
+
+    login_username = allocate_unique_username(session, base_username)
+    password = build_login_password(login_username)
+    email = build_student_email(login_username)
+    if username_or_email_exists(session, login_username, email):
+        email = f"{login_username}.{admin_user_id}@students.local"
+
+    profile_data = _optional_profile_fields_from_row(row)
+    student = create_student_user(
+        session,
+        username=login_username,
+        full_name=full_name,
+        email=email,
+        password=password,
+        profile_data=profile_data,
+        created_by_admin_id=admin_user_id,
+    )
+    if not profile_data:
+        upsert_student_profile(session, student.id, {})
+
+    student_id = student.id
+    login_to_student_id[login_username] = student_id
+    import_batch_cache[base_username] = student_id
+
+    credentials = {
+        "full_name": full_name,
+        "username": login_username,
+        "password": password,
+        "csv_label": csv_slug or f"{first}_{last}",
+    }
+    return student_id, credentials
+
+
 def bulk_import_students_from_csv(
     session,
     csv_frame: pd.DataFrame,
     admin_user_id: int,
 ) -> dict[str, Any]:
-    """Create student accounts (if needed) and import academic rows for the logged-in admin."""
+    """Create a student account for every row, then save academic data (linked to admin)."""
     from src.utils.file_upload import prepare_import_dataframe
 
-    csv_frame = prepare_import_dataframe(csv_frame)
-    total_rows = len(csv_frame)
+    prepared = prepare_import_dataframe(csv_frame)
+    total_rows = len(prepared)
     if total_rows == 0:
         raise ValueError("The file has no data rows to import.")
 
-    raw_rows = csv_frame.to_dict(orient="records")
-    normalized = normalize_academic_csv_frame(csv_frame.copy())
-
-    required_columns = set(ACADEMIC_DB_COLUMNS)
+    normalized = normalize_academic_csv_frame(prepared.copy())
+    required_columns = set(ACADEMIC_RECORD_DB_COLUMNS)
     missing_columns = required_columns.difference(normalized.columns)
     if missing_columns:
         friendly_missing = [DB_TO_SCHOOL_CSV_HEADER.get(col, col) for col in sorted(missing_columns)]
@@ -458,62 +520,38 @@ def bulk_import_students_from_csv(
         row.username: row.id
         for row in session.execute(select(User.username, User.id).where(User.role == "student")).all()
     }
-    base_username_to_student_id: dict[str, int] = {}
+    import_batch_cache: dict[str, int] = {}
 
     created_accounts: list[dict[str, str]] = []
     existing_accounts_used: list[str] = []
     records_imported = 0
     row_errors: list[str] = []
 
-    for index, norm_row in enumerate(normalized.to_dict(orient="records")):
-        raw_row = raw_rows[index]
-        merged_row = {**raw_row, **norm_row}
+    prepared_rows = prepared.to_dict(orient="records")
+    normalized_rows = normalized.to_dict(orient="records")
+
+    for index in range(total_rows):
+        merged_row = {**prepared_rows[index], **normalized_rows[index]}
+        label = str(merged_row.get("student_username") or f"row {index + 2}")
         try:
-            first, last, full_name = resolve_student_name(merged_row)
-            base_username = build_login_username(first, last)
-            student_id = base_username_to_student_id.get(base_username)
-            if not student_id:
-                student_id = login_to_student_id.get(base_username)
-
-            if not student_id:
-                login_username = allocate_unique_username(session, base_username)
-                password = build_login_password(login_username)
-                email = build_student_email(login_username)
-                if username_or_email_exists(session, login_username, email):
-                    email = f"{login_username}.{admin_user_id}@students.local"
-                profile_data = _optional_profile_fields_from_row(merged_row)
-                student = create_student_user(
-                    session,
-                    username=login_username,
-                    full_name=full_name,
-                    email=email,
-                    password=password,
-                    profile_data=profile_data,
-                    created_by_admin_id=admin_user_id,
-                )
-                student_id = student.id
-                login_to_student_id[login_username] = student_id
-                base_username_to_student_id[base_username] = student_id
-                created_accounts.append(
-                    {
-                        "full_name": full_name,
-                        "username": login_username,
-                        "password": password,
-                        "csv_label": str(merged_row.get("student_username", "")),
-                    }
-                )
+            student_id, credentials = _get_or_create_student_for_import(
+                session,
+                merged_row,
+                admin_user_id,
+                login_to_student_id,
+                import_batch_cache,
+            )
+            if credentials:
+                created_accounts.append(credentials)
             else:
-                base_username_to_student_id[base_username] = student_id
-                existing_accounts_used.append(base_username)
-                if profile_fields := _optional_profile_fields_from_row(merged_row):
-                    upsert_student_profile(session, student_id, profile_fields)
+                existing_accounts_used.append(label)
 
-            add_academic_record(session, student_id, _academic_record_from_row(norm_row))
+            add_academic_record(session, student_id, _academic_record_from_row(normalized_rows[index]))
             records_imported += 1
         except Exception as exc:
-            label = str(merged_row.get("student_username", f"row {index + 2}"))
             row_errors.append(f"{label}: {exc}")
 
+    session.flush()
     return {
         "total_rows": total_rows,
         "records_imported": records_imported,
@@ -524,32 +562,14 @@ def bulk_import_students_from_csv(
     }
 
 
-def bulk_insert_academic_records(session, csv_frame: pd.DataFrame) -> dict[str, Any]:
-    csv_frame = normalize_academic_csv_frame(csv_frame.copy())
-    required_columns = set(ACADEMIC_DB_COLUMNS)
-    missing_columns = required_columns.difference(csv_frame.columns)
-    if missing_columns:
-        friendly_missing = [DB_TO_SCHOOL_CSV_HEADER.get(col, col) for col in sorted(missing_columns)]
-        raise ValueError(f"Missing required columns: {', '.join(friendly_missing)}")
-
-    user_rows = session.execute(select(User.id, User.username).where(User.role == "student")).all()
-    username_to_id = {row.username: row.id for row in user_rows}
-    inserted_count = 0
-    skipped_usernames: list[str] = []
-
-    for row in csv_frame.to_dict(orient="records"):
-        username = str(row["student_username"]).strip()
-        student_id = username_to_id.get(username)
-        if not student_id:
-            skipped_usernames.append(username)
-            continue
-        add_academic_record(session, student_id=student_id, record_data=_academic_record_from_row(row))
-        inserted_count += 1
-
+def bulk_insert_academic_records(session, csv_frame: pd.DataFrame, admin_user_id: int) -> dict[str, Any]:
+    """Legacy name — always creates student accounts via bulk_import_students_from_csv."""
+    result = bulk_import_students_from_csv(session, csv_frame, admin_user_id=admin_user_id)
     return {
-        "inserted": inserted_count,
-        "skipped": len(skipped_usernames),
-        "skipped_usernames": skipped_usernames,
+        "inserted": result["records_imported"],
+        "skipped": len(result["row_errors"]),
+        "skipped_usernames": result["row_errors"],
+        **result,
     }
 
 

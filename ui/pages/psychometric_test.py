@@ -11,6 +11,8 @@ from src.services.psychometric_service import (
     list_recent_attempts,
     save_psychometric_attempt,
 )
+from ui.components.layout import show_plotly_chart
+from ui.components.tables import show_dataframe
 
 
 def _init_psychometric_state() -> None:
@@ -107,7 +109,7 @@ def render(current_user: dict) -> None:
                 [{"Category": category, "Score": score} for category, score in latest_scores.items()]
             ).sort_values("Score", ascending=False)
             chart = px.bar(chart_df, x="Category", y="Score", color="Category", title="Your Interest Profile")
-            st.plotly_chart(chart, use_container_width=True, config={"displayModeBar": False})
+            show_plotly_chart(chart, key="psychometric_interest_chart")
 
     with st.expander("Take or retake the assessment", expanded=not latest_attempt):
         _render_assessment_flow(current_user["id"])
@@ -115,6 +117,6 @@ def render(current_user: dict) -> None:
     st.divider()
     st.subheader("Recent Attempts")
     if recent_attempts:
-        st.dataframe(recent_attempts, use_container_width=True, hide_index=True)
+        show_dataframe(recent_attempts)
     else:
         st.info("No assessment attempts found yet.")

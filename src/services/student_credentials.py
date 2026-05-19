@@ -30,11 +30,20 @@ def resolve_student_name(row: dict) -> tuple[str, str, str]:
         last = str(raw_last).strip()
     else:
         slug = str(row.get("student_username", "")).strip().replace("-", "_")
-        parts = [part for part in slug.split("_") if part]
-        if not parts:
-            raise ValueError("student_username must be like firstname_lastname (e.g. aarav_patil).")
-        first = parts[0]
-        last = parts[-1] if len(parts) > 1 else parts[0]
+        if not slug or slug.lower() in {"nan", "none"}:
+            full = str(row.get("full_name") or row.get("student_name") or "").strip()
+            parts = [part for part in full.replace(",", " ").split() if part]
+            if len(parts) < 2:
+                raise ValueError(
+                    "Each row needs student_username (firstname_lastname) or first_name + last_name."
+                )
+            first, last = parts[0], parts[-1]
+        else:
+            parts = [part for part in slug.split("_") if part]
+            if not parts:
+                raise ValueError("student_username must be like firstname_lastname (e.g. aarav_patil).")
+            first = parts[0]
+            last = parts[-1] if len(parts) > 1 else parts[0]
     full_name = f"{first.title()} {last.title()}"
     return first, last, full_name
 

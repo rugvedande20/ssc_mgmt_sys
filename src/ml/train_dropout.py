@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 import joblib
 import numpy as np
@@ -9,13 +9,16 @@ import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from config.settings import settings
-
+from src.ml.evaluation import (
+    build_test_evaluation,
+    derive_risk_thresholds,
+    extract_feature_importances,
+)
 
 FEATURE_COLUMNS = [
     "attendance_percentage",
@@ -61,6 +64,16 @@ CATEGORICAL_FEATURES = [
 ]
 
 TARGET_COLUMN = "dropout_label"
+TARGET_POSITIVE_RATE = 0.12
+
+REFERENCE_NOTES = (
+    "Aligned with `models/reference models/` from the similar dropout project: "
+    "numeric features are median-imputed and **StandardScaled**, categoricals are "
+    "one-hot encoded (`drop='first'`), and a **RandomForestClassifier** (`random_state=42`) "
+    "is fit on the transformed matrix. The reference used the Portuguese university "
+    "dataset (212 encoded columns, OneVsRest multiclass); this app uses **school-specific** "
+    "Class 6–10 fields (attendance, marks, fees, engagement, etc.) with a binary at-risk label."
+)
 
 
 def train_and_save_dropout_model(random_state: int = 42) -> dict:
@@ -75,12 +88,7 @@ def train_and_save_dropout_model(random_state: int = 42) -> dict:
     )
 
     preprocessor = build_preprocessor()
-    classifier = RandomForestClassifier(
-        n_estimators=220,
-        max_depth=8,
-        min_samples_leaf=3,
-        random_state=random_state,
-    )
+    classifier = RandomForestClassifier(random_state=random_state)
     pipeline = Pipeline(
         steps=[
             ("preprocessor", preprocessor),
@@ -91,30 +99,51 @@ def train_and_save_dropout_model(random_state: int = 42) -> dict:
 
     probabilities = pipeline.predict_proba(test_df[FEATURE_COLUMNS])[:, 1]
     predictions = pipeline.predict(test_df[FEATURE_COLUMNS])
+    evaluation = build_test_evaluation(test_df[TARGET_COLUMN], predictions, probabilities)
+    risk_thresholds = derive_risk_thresholds(probabilities)
 
-    metrics = {
-        "accuracy": round(float(accuracy_score(test_df[TARGET_COLUMN], predictions)), 4),
-        "f1_score": round(float(f1_score(test_df[TARGET_COLUMN], predictions)), 4),
-        "roc_auc": round(float(roc_auc_score(test_df[TARGET_COLUMN], probabilities)), 4),
+    metadata = {
+        "trained_at": datetime.now(timezone.utc).isoformat(),
+        "dataset_type": "synthetic_baseline",
         "train_size": int(len(train_df)),
         "test_size": int(len(test_df)),
-        "trained_at": datetime.utcnow().isoformat(),
-        "dataset_type": "synthetic_baseline",
+        "train_dropout_rate": round(float(train_df[TARGET_COLUMN].mean()), 4),
+        "test_dropout_rate": round(float(test_df[TARGET_COLUMN].mean()), 4),
+        "target_positive_rate": TARGET_POSITIVE_RATE,
+        "feature_columns": FEATURE_COLUMNS,
+        "numeric_features": NUMERIC_FEATURES,
+        "categorical_features": CATEGORICAL_FEATURES,
+        "preprocessing": {
+            "numeric": "median imputation + StandardScaler",
+            "categorical": "most-frequent imputation + OneHotEncoder(drop='first')",
+        },
+        "classifier": "RandomForestClassifier",
+        "classifier_params": classifier.get_params(),
+        "risk_thresholds": risk_thresholds,
+        "top_feature_importances": extract_feature_importances(pipeline),
+        "reference_notes": REFERENCE_NOTES,
+        "evaluation": evaluation,
+        **evaluation,
     }
 
     model_path = settings.model_dir / "dropout_pipeline.joblib"
     metadata_path = settings.model_dir / "dropout_metadata.json"
     joblib.dump(pipeline, model_path)
-    metadata_path.write_text(json.dumps(metrics, indent=2), encoding="utf-8")
-    return metrics
+    metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    return metadata
 
 
 def build_preprocessor() -> ColumnTransformer:
-    numeric_transformer = Pipeline(steps=[("imputer", SimpleImputer(strategy="median"))])
+    numeric_transformer = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", StandardScaler()),
+        ]
+    )
     categorical_transformer = Pipeline(
         steps=[
             ("imputer", SimpleImputer(strategy="most_frequent")),
-            ("encoder", OneHotEncoder(handle_unknown="ignore")),
+            ("encoder", OneHotEncoder(handle_unknown="ignore", drop="first", sparse_output=False)),
         ]
     )
 
@@ -174,5 +203,6 @@ def build_synthetic_dropout_dataset(rows: int = 1400, random_state: int = 42) ->
     )
     noise = rng.normal(0, 0.75, rows)
     dropout_probability = 1 / (1 + np.exp(-(risk_signal - 2.9 + noise)))
-    df[TARGET_COLUMN] = (dropout_probability > 0.5).astype(int)
+    label_threshold = np.quantile(dropout_probability, 1 - TARGET_POSITIVE_RATE)
+    df[TARGET_COLUMN] = (dropout_probability >= label_threshold).astype(int)
     return df

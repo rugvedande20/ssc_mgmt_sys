@@ -4,6 +4,7 @@ from config.settings import settings
 from src.auth.guards import get_current_user, init_session_state, logout_user
 from src.db.database import Base, apply_schema_patches, get_database_mode, get_engine, get_db_session
 from src.db.seed import seed_demo_data
+from ui.components.theme import inject_app_theme, render_app_hero
 
 
 st.set_page_config(
@@ -12,6 +13,21 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+ADMIN_PAGES = [
+    "Dashboard",
+    "Student Management",
+    "Academic Data Upload",
+    "Dropout Analysis",
+    "Interventions",
+]
+
+STUDENT_PAGES = [
+    "Dashboard",
+    "Profile",
+    "Interest Assessment",
+    "Career Ideas",
+]
 
 
 @st.cache_resource(show_spinner=False)
@@ -24,44 +40,53 @@ def bootstrap_database() -> bool:
     return True
 
 
-def render_sidebar(user: dict | None) -> str:
-    st.sidebar.title("Navigation")
-    if not user:
-        return "Login"
+def page_options_for(user: dict) -> list[str]:
+    return ADMIN_PAGES if user["role"] == "admin" else STUDENT_PAGES
 
-    st.sidebar.write(f"Signed in as **{user['full_name']}**")
-    st.sidebar.caption(user["role"].title())
 
-    if user["role"] == "admin":
-        options = [
-            "Dashboard",
-            "Student Management",
-            "Academic Data Upload",
-            "Dropout Analysis",
-            "Interventions",
-        ]
-    else:
-        options = [
-            "Dashboard",
-            "Profile",
-            "Interest Assessment",
-            "Career Ideas",
-        ]
+def render_sidebar_nav(user: dict) -> str:
+    options = page_options_for(user)
+    if "nav_page" not in st.session_state or st.session_state["nav_page"] not in options:
+        st.session_state["nav_page"] = options[0]
 
-    selected = st.sidebar.radio("Go to", options, label_visibility="collapsed")
-
-    database_mode = get_database_mode()
-    if database_mode == "memory":
-        st.sidebar.divider()
-        st.sidebar.warning(
-            "Using in-memory database — data resets when the app restarts. "
-            "Use a writable data folder for persistent SQLite."
-        )
-
-    if st.sidebar.button("Logout", use_container_width=True):
-        logout_user()
-        st.rerun()
+    st.sidebar.markdown('<p class="nav-heading">Menu</p>', unsafe_allow_html=True)
+    selected = st.sidebar.radio(
+        "Navigation",
+        options,
+        index=options.index(st.session_state["nav_page"]),
+        label_visibility="collapsed",
+        key="sidebar_nav_radio",
+    )
+    st.session_state["nav_page"] = selected
     return selected
+
+
+def render_sidebar(user: dict | None) -> str | None:
+    if not user:
+        return None
+
+    st.sidebar.markdown(
+        f"""
+        <div class="sidebar-account">
+          <strong>{user["full_name"]}</strong><br/>
+          <span style="color:#64748b;font-size:0.85rem;">{user["role"].title()}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if get_database_mode() == "memory":
+        st.sidebar.warning("In-memory DB — data resets on restart.")
+
+    page_name = render_sidebar_nav(user)
+
+    st.sidebar.divider()
+    if st.sidebar.button("Logout", use_container_width=True, key="sidebar_logout"):
+        logout_user()
+        st.session_state.pop("nav_page", None)
+        st.rerun()
+
+    return page_name
 
 
 def render_page(page_name: str, user: dict | None) -> None:
@@ -104,14 +129,18 @@ def render_page(page_name: str, user: dict | None) -> None:
 def main() -> None:
     init_session_state()
     bootstrap_database()
-    current_user = get_current_user()
+    inject_app_theme()
 
-    st.title(settings.app_name)
+    current_user = get_current_user()
     from config.school_context import APP_TAGLINE
 
-    st.caption(APP_TAGLINE)
+    if not current_user:
+        render_app_hero(settings.app_name, APP_TAGLINE)
+        render_page("Login", None)
+        return
 
     page_name = render_sidebar(current_user)
+    render_app_hero(settings.app_name, APP_TAGLINE)
     render_page(page_name, current_user)
 
 
