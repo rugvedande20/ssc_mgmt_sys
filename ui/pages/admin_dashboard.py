@@ -7,13 +7,18 @@ from src.services.dropout_service import list_latest_predictions_per_student
 from src.services.user_service import get_dashboard_counts
 from ui.components.charts import risk_distribution_chart
 from ui.components.layout import section, show_plotly_chart
+from ui.components.page_chrome import render_page_header
 from ui.components.risk_display import render_risk_explanations_section
 from ui.components.tables import show_dataframe
 
 
 def render(current_user: dict) -> None:
-    st.header("Dashboard")
-    st.caption(f"Welcome back, {current_user['full_name']}.")
+    render_page_header(
+        "Dashboard",
+        f"Welcome back, {current_user['full_name']}.",
+        badge_text="Admin",
+        badge_variant="indigo",
+    )
 
     with get_db_session() as session:
         counts = get_dashboard_counts(session)

@@ -16,6 +16,8 @@ SCHOOL_BOARDS = ("", "CBSE", "ICSE", "State Board", "IB", "Other")
 
 # DB column name -> admin/student-facing label
 PROFILE_FIELD_LABELS = {
+    "age": "Age",
+    "gender": "Gender",
     "department": "School name",
     "semester": "Class",
     "family_income_band": "Family income band",
@@ -25,6 +27,20 @@ PROFILE_FIELD_LABELS = {
     "interests_summary": "Interests and hobbies",
     "strengths_summary": "Strengths and achievements",
 }
+
+# Fields students must complete before assessment / career features unlock
+REQUIRED_STUDENT_PROFILE_FIELDS = (
+    "age",
+    "gender",
+    "department",
+    "semester",
+    "family_income_band",
+    "parental_education",
+    "travel_distance_km",
+    "internet_access",
+    "interests_summary",
+    "strengths_summary",
+)
 
 ACADEMIC_FIELD_LABELS = {
     "attendance_percentage": "Attendance (%)",

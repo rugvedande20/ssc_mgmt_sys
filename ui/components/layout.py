@@ -8,10 +8,18 @@ import streamlit as st
 
 @contextmanager
 def section(title: str, caption: str = "") -> Iterator[None]:
+    import html
+
     with st.container(border=True):
-        st.subheader(title)
+        st.markdown(
+            f'<div class="section-title">{html.escape(title)}</div>',
+            unsafe_allow_html=True,
+        )
         if caption:
-            st.caption(caption)
+            st.markdown(
+                f'<p class="section-caption">{html.escape(caption)}</p>',
+                unsafe_allow_html=True,
+            )
         yield
 
 

@@ -29,6 +29,8 @@ STUDENT_PAGES = [
     "Career Ideas",
 ]
 
+STUDENT_ONBOARDING_PAGE = "Complete Profile"
+
 
 @st.cache_resource(show_spinner=False)
 def bootstrap_database() -> bool:
@@ -41,8 +43,21 @@ def bootstrap_database() -> bool:
     return True
 
 
+def _student_page_options(user_id: int) -> list[str]:
+    from src.services.student_service import get_student_profile_payload
+    from src.utils.helpers import is_student_profile_complete
+
+    with get_db_session() as session:
+        profile = get_student_profile_payload(session, user_id)
+    if is_student_profile_complete(profile):
+        return list(STUDENT_PAGES)
+    return [STUDENT_ONBOARDING_PAGE]
+
+
 def page_options_for(user: dict) -> list[str]:
-    return ADMIN_PAGES if user["role"] == "admin" else STUDENT_PAGES
+    if user["role"] == "admin":
+        return ADMIN_PAGES
+    return _student_page_options(user["id"])
 
 
 def render_sidebar_nav(user: dict) -> str:
@@ -116,15 +131,22 @@ def render_page(page_name: str, user: dict | None) -> None:
         admin_pages.get(page_name, lambda: admin_dashboard.render(user))()
         return
 
-    from ui.pages import career_recommendations, profile, psychometric_test, student_dashboard
+    from ui.pages import (
+        career_recommendations,
+        profile,
+        psychometric_test,
+        student_dashboard,
+        student_onboarding,
+    )
 
     student_pages = {
+        STUDENT_ONBOARDING_PAGE: lambda: student_onboarding.render(user),
         "Dashboard": lambda: student_dashboard.render(user),
         "Profile": lambda: profile.render(user),
         "Interest Assessment": lambda: psychometric_test.render(user),
         "Career Ideas": lambda: career_recommendations.render(user),
     }
-    student_pages.get(page_name, lambda: student_dashboard.render(user))()
+    student_pages.get(page_name, lambda: student_onboarding.render(user))()
 
 
 def main() -> None:

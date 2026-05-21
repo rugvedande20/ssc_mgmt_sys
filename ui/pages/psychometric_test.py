@@ -11,7 +11,8 @@ from src.services.psychometric_service import (
     list_recent_attempts,
     save_psychometric_attempt,
 )
-from ui.components.layout import show_plotly_chart
+from ui.components.layout import section, show_plotly_chart
+from ui.components.page_chrome import render_highlight_panel, render_page_header
 from ui.components.tables import show_dataframe
 
 
@@ -90,9 +91,31 @@ def _render_assessment_flow(student_id: int) -> None:
 
 
 def render(current_user: dict) -> None:
-    st.title("Interest & Strength Assessment")
-    st.caption(
-        "A short RIASEC-style questionnaire to discover activities and subjects you enjoy—helpful for exploring future paths in Class 6–10."
+    from src.services.student_service import get_student_profile_payload
+    from src.utils.helpers import is_student_profile_complete
+
+    with get_db_session() as session:
+        profile = get_student_profile_payload(session, current_user["id"])
+    if not is_student_profile_complete(profile):
+        render_page_header(
+            "Interest & Strength Assessment",
+            "Complete your school profile first to unlock this assessment.",
+            badge_text="Locked",
+            badge_variant="amber",
+        )
+        render_highlight_panel(
+            "Profile required",
+            "Open **Complete Profile** from the menu, then return here.",
+            variant="amber",
+            icon="!",
+        )
+        return
+
+    render_page_header(
+        "Interest & Strength Assessment",
+        "A short RIASEC-style questionnaire — discover subjects and activities you enjoy (Class 6–10).",
+        badge_text="RIASEC",
+        badge_variant="violet",
     )
 
     with get_db_session() as session:
@@ -101,22 +124,30 @@ def render(current_user: dict) -> None:
 
     latest_scores = latest_attempt["score_map"] if latest_attempt else {}
     if latest_attempt:
-        st.success("You already have a saved assessment. You can retake the test anytime.")
-        st.write(latest_attempt["summary"])
-        st.caption(f"Last taken: {latest_attempt['submitted_at']} · Top codes: {latest_attempt['top_codes']}")
-        if latest_scores:
-            chart_df = pd.DataFrame(
-                [{"Category": category, "Score": score} for category, score in latest_scores.items()]
-            ).sort_values("Score", ascending=False)
-            chart = px.bar(chart_df, x="Category", y="Score", color="Category", title="Your Interest Profile")
-            show_plotly_chart(chart, key="psychometric_interest_chart")
+        with section("Your latest results", "Saved assessment summary and interest chart."):
+            render_highlight_panel(
+                "Assessment complete",
+                latest_attempt["summary"],
+                variant="emerald",
+                icon="✓",
+            )
+            st.caption(f"Last taken: {latest_attempt['submitted_at']} · Top codes: {latest_attempt['top_codes']}")
+            if latest_scores:
+                chart_df = pd.DataFrame(
+                    [{"Category": category, "Score": score} for category, score in latest_scores.items()]
+                ).sort_values("Score", ascending=False)
+                chart = px.bar(chart_df, x="Category", y="Score", color="Category", title="Your Interest Profile")
+                show_plotly_chart(chart, key="psychometric_interest_chart")
 
-    with st.expander("Take or retake the assessment", expanded=not latest_attempt):
-        _render_assessment_flow(current_user["id"])
+    with section(
+        "Take or retake the assessment",
+        "Six short sections — rate how much each statement describes you.",
+    ):
+        with st.expander("Open questionnaire", expanded=not latest_attempt):
+            _render_assessment_flow(current_user["id"])
 
-    st.divider()
-    st.subheader("Recent Attempts")
-    if recent_attempts:
-        show_dataframe(recent_attempts)
-    else:
-        st.info("No assessment attempts found yet.")
+    with section("Recent attempts", "Your last five submissions."):
+        if recent_attempts:
+            show_dataframe(recent_attempts)
+        else:
+            st.info("No assessment attempts found yet.")

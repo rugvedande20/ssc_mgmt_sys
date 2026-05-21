@@ -48,3 +48,10 @@ streamlit run streamlit_app.py
 3. Student → complete profile → interest assessment → career ideas page
 
 **Note:** Restart the app after upgrading; legacy demo data for removed students is cleaned up automatically on startup.
+
+## Deploy on Streamlit Community Cloud
+
+1. Main file: `streamlit_app.py`
+2. Python version: `runtime.txt` must be in the repo root (`python-3.12`). Without it, Cloud may use Python 3.14 and fail to build `pandas` / `pyarrow`.
+3. Dependencies: only `requirements.txt` (do not pin `pyarrow` or other Streamlit-managed packages separately).
+4. After pushing, open **Manage app → Reboot app** if dependency errors persist.

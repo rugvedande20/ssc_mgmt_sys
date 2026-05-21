@@ -7,13 +7,21 @@ from src.services.user_service import build_user_payload
 
 
 def render() -> None:
-    st.title("Login")
-    st.caption("Sign in as a school teacher/admin or as a student (Class 6–10).")
+    st.markdown('<div class="login-shell">', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="login-card">
+          <h2>Welcome back</h2>
+          <p>Sign in as a school teacher/admin or as a student (Class 6–10).</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     with st.form("login_form", clear_on_submit=False):
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
-        submitted = st.form_submit_button("Sign in", use_container_width=True)
+        submitted = st.form_submit_button("Sign in", use_container_width=True, type="primary")
 
     if submitted:
         with get_db_session() as session:
@@ -31,6 +39,8 @@ def render() -> None:
         st.markdown(
             """
             - **Admin:** `admin` / `Admin@123`
-            - **Students:** accounts created by your admin under Student Management
+            - **Students:** accounts created by your admin under **Student Management**
             """
         )
+
+    st.markdown("</div>", unsafe_allow_html=True)
