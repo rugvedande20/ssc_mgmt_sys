@@ -25,7 +25,7 @@ A Streamlit app for **Indian school students in Class 6–10** (upper primary / 
 
 ```bash
 pip install -r requirements.txt
-streamlit run app.py
+streamlit run streamlit_app.py
 ```
 
 Use the project virtual environment if you have one:
@@ -33,13 +33,13 @@ Use the project virtual environment if you have one:
 ```bash
 .\.venv\Scripts\activate
 pip install -r requirements.txt
-streamlit run app.py
+streamlit run streamlit_app.py
 ```
 
 ## Demo credentials
 
 - Admin: `admin` / `Admin@123`
-- Student: `student1` / `Student@123`
+- Students: created by the admin under **Student Management** (no default demo student account)
 
 ## Demo flow
 
@@ -47,4 +47,4 @@ streamlit run app.py
 2. Dropout Analysis → train model → run predictions
 3. Student → complete profile → interest assessment → career ideas page
 
-**Note:** If you already ran the app with older seed data, delete `data/app.db` once to load the Class 6–10 demo student, or create a fresh student account.
+**Note:** Restart the app after upgrading; legacy demo data for removed students is cleaned up automatically on startup.

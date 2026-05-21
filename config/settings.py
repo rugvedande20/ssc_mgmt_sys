@@ -18,7 +18,7 @@ class AppSettings(BaseModel):
     @property
     def database_url(self) -> str:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        return str(URL.create("sqlite+pysqlite", database=str(self.db_path)))
+        return str(URL.create("sqlite", database=str(self.db_path.resolve())))
 
 
 settings = AppSettings()

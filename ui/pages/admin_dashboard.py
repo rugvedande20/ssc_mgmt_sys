@@ -61,11 +61,8 @@ def render(current_user: dict) -> None:
                 st.info("No students yet. Create accounts under Student Management.")
 
     if predictions:
-        with section(
-            "Risk explanations",
-            "Factors behind each student's latest risk band.",
-        ):
-            render_risk_explanations_section(predictions)
+        st.divider()
+        render_risk_explanations_section(predictions, section_key="admin_risk_expl")
 
     chart = risk_distribution_chart(predictions if predictions else [])
     with section("Risk distribution", "Count of students in each risk band."):

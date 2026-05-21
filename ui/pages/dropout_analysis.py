@@ -68,8 +68,5 @@ def render() -> None:
         if chart:
             show_plotly_chart(chart, key="dropout_analysis_risk_chart")
 
-    with section(
-        "Risk explanations",
-        "Readable breakdown of factors for each student (not hidden in a dropdown).",
-    ):
-        render_risk_explanations_section(latest_predictions)
+    st.divider()
+    render_risk_explanations_section(latest_predictions, section_key="dropout_risk_expl")

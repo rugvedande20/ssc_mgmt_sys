@@ -6,6 +6,8 @@ from sqlalchemy import desc, func, select
 
 from src.db.models import AcademicRecord, DropoutPrediction, StudentProfile, User
 
+EXCLUDED_STUDENT_NAME = "Rahul Verma"
+
 
 def train_dropout_model() -> dict:
     from src.ml.train_dropout import train_and_save_dropout_model
@@ -40,7 +42,11 @@ def build_prediction_candidates(session) -> list[dict[str, Any]]:
         .join(latest_record_subquery, latest_record_subquery.c.student_id == User.id)
         .join(AcademicRecord, AcademicRecord.id == latest_record_subquery.c.id)
         .outerjoin(StudentProfile, StudentProfile.user_id == User.id)
-        .where(User.role == "student", latest_record_subquery.c.record_rank == 1)
+        .where(
+            User.role == "student",
+            latest_record_subquery.c.record_rank == 1,
+            User.full_name != EXCLUDED_STUDENT_NAME,
+        )
         .order_by(User.full_name.asc())
     ).all()
 
@@ -175,7 +181,11 @@ def list_latest_predictions_per_student(session, limit: int = 100) -> list[dict[
         )
         .join(latest_prediction_subquery, latest_prediction_subquery.c.student_id == User.id)
         .join(DropoutPrediction, DropoutPrediction.id == latest_prediction_subquery.c.id)
-        .where(User.role == "student", latest_prediction_subquery.c.prediction_rank == 1)
+        .where(
+            User.role == "student",
+            latest_prediction_subquery.c.prediction_rank == 1,
+            User.full_name != EXCLUDED_STUDENT_NAME,
+        )
         .order_by(desc(DropoutPrediction.risk_score))
         .limit(limit)
     ).all()

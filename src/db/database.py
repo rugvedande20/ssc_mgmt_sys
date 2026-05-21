@@ -34,7 +34,7 @@ def get_engine():
         _DATABASE_MODE = "file"
         return engine
     except OperationalError:
-        fallback_engine = _build_engine("sqlite+pysqlite:///:memory:")
+        fallback_engine = _build_engine("sqlite:///:memory:")
         _DATABASE_MODE = "memory"
         return fallback_engine
 

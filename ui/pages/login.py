@@ -31,6 +31,6 @@ def render() -> None:
         st.markdown(
             """
             - **Admin:** `admin` / `Admin@123`
-            - **Student:** `student1` / `Student@123`
+            - **Students:** accounts created by your admin under Student Management
             """
         )

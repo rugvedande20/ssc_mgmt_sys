@@ -1,3 +1,4 @@
+# Core application dependencies
 streamlit==1.44.1
 SQLAlchemy==2.0.39
 pandas==2.2.3
@@ -5,5 +6,18 @@ plotly==6.0.1
 pydantic==2.11.3
 numpy==1.26.4
 scikit-learn==1.5.2
+scipy==1.11.4
 joblib==1.4.2
 openpyxl==3.1.5
+
+# Streamlit / pandas runtime (avoids ModuleNotFoundError on Streamlit Cloud)
+altair==5.5.0
+pyarrow==17.0.0
+pillow==11.1.0
+protobuf>=4.21.0,<6
+tornado>=6.0.3,<7
+pydeck==0.9.1
+packaging>=24.0
+typing-extensions>=4.8.0
+python-dateutil>=2.8.2
+tzdata>=2024.1

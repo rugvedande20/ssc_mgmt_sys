@@ -137,7 +137,7 @@ DB_TO_SCHOOL_CSV_HEADER = {v: k for k, v in ACADEMIC_CSV_ALIASES.items() if k in
 def build_academic_csv_template_rows() -> list[dict[str, object]]:
     return [
         {
-            "student_username": "student1",
+            "student_username": "student_username",
             "attendance_pct": 88.0,
             "overall_marks_pct": 74.0,
             "latest_term_test_pct": 72.0,

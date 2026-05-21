@@ -3,7 +3,7 @@ import streamlit as st
 from config.settings import settings
 from src.auth.guards import get_current_user, init_session_state, logout_user
 from src.db.database import Base, apply_schema_patches, get_database_mode, get_engine, get_db_session
-from src.db.seed import seed_demo_data
+from src.db.seed import remove_legacy_demo_student, seed_demo_data
 from ui.components.theme import inject_app_theme, render_app_hero
 
 
@@ -36,6 +36,7 @@ def bootstrap_database() -> bool:
     Base.metadata.create_all(bind=engine)
     apply_schema_patches(engine)
     with get_db_session() as session:
+        remove_legacy_demo_student(session)
         seed_demo_data(session)
     return True
 
