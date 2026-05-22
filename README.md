@@ -55,3 +55,10 @@ streamlit run streamlit_app.py
 2. Python version: `runtime.txt` must be in the repo root (`python-3.12`). Without it, Cloud may use Python 3.14 and fail to build `pandas` / `pyarrow`.
 3. Dependencies: only `requirements.txt` (do not pin `pyarrow` or other Streamlit-managed packages separately).
 4. After pushing, open **Manage app → Reboot app** if dependency errors persist.
+
+## Deploy on Render
+
+1. **Python 3.12 is required.** Render ignores `runtime.txt`; use the repo root `.python-version` (`3.12.8`) or set environment variable `PYTHON_VERSION` to `3.12.8` in the Render dashboard.
+2. Build command: `pip install -r requirements.txt`
+3. Start command: `streamlit run streamlit_app.py --server.port=$PORT --server.address=0.0.0.0`
+4. If the build still picks Python 3.14, clear the build cache and redeploy after pushing `.python-version`.

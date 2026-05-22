@@ -1,5 +1,5 @@
-# Deploy on Streamlit Community Cloud with runtime.txt (python-3.12).
-# Keep this list minimal — Streamlit pulls altair, pyarrow, pillow, etc. with compatible wheels.
+# Pin Python 3.12 for deploys (Render: .python-version; Streamlit Cloud: runtime.txt).
+# Do not use Python 3.14 — pandas/numpy/scipy lack wheels and will try to compile from source.
 streamlit==1.44.1
 SQLAlchemy==2.0.39
 pandas==2.2.3
@@ -7,6 +7,6 @@ plotly==6.0.1
 pydantic==2.11.3
 numpy==1.26.4
 scikit-learn==1.5.2
-scipy==1.11.4
+scipy==1.14.1
 joblib==1.4.2
 openpyxl==3.1.5
