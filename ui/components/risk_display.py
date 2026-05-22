@@ -3,11 +3,14 @@ from __future__ import annotations
 import html
 import re
 from datetime import datetime
+
+from src.utils.datetime_ist import format_date_ist, parse_display_datetime
 from typing import Any
 
 import streamlit as st
 
 EXCLUDED_STUDENT_NAME = "Rahul Verma"
+RISK_EXPLANATIONS_ANCHOR_ID = "risk-explanations-section"
 
 RISK_LEVEL_STYLES: dict[str, tuple[str, str, str]] = {
     "Low": ("#F0FDF4", "#15803D", "#86EFAC"),
@@ -96,11 +99,9 @@ def student_initials(name: str) -> str:
 
 
 def format_long_date(value: str) -> str:
-    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d"):
-        try:
-            return datetime.strptime(value, fmt).strftime("%b %d, %Y")
-        except ValueError:
-            continue
+    parsed = parse_display_datetime(value)
+    if parsed:
+        return format_date_ist(parsed)
     return value
 
 
@@ -115,6 +116,9 @@ def _inject_risk_explanations_styles() -> None:
     st.markdown(
         """
         <style>
+          .risk-expl-anchor {
+            scroll-margin-top: 5.5rem;
+          }
           .risk-expl-header {
             display: flex;
             align-items: flex-start;
@@ -404,13 +408,17 @@ def render_risk_explanations_section(
         for row in predictions
         if (parsed := _parse_display_date(format_long_date(str(row.get("predicted_at", "")))))
     ]
-    latest_date = max(parsed_dates).strftime("%b %d, %Y") if parsed_dates else ""
+    latest_date = format_date_ist(max(parsed_dates)) if parsed_dates else ""
     unique_dates = sorted(
         {format_long_date(str(row.get("predicted_at", ""))) for row in predictions},
         key=lambda value: _parse_display_date(value) or datetime.min,
         reverse=True,
     )
 
+    st.markdown(
+        f'<div id="{RISK_EXPLANATIONS_ANCHOR_ID}" class="risk-expl-anchor"></div>',
+        unsafe_allow_html=True,
+    )
     st.markdown(
         f"""
         <div class="risk-expl-header">
@@ -479,6 +487,38 @@ def _parse_display_date(value: str) -> datetime | None:
         return datetime.strptime(value, "%b %d, %Y")
     except ValueError:
         return None
+
+
+def scroll_to_risk_explanations() -> None:
+    """Scroll main page to the risk explanations anchor (after navigation from dashboard)."""
+    import streamlit.components.v1 as components
+
+    anchor = RISK_EXPLANATIONS_ANCHOR_ID
+    components.html(
+        f"""
+        <script>
+        (function() {{
+          const id = "{anchor}";
+          function go() {{
+            const doc = window.parent.document;
+            const el = doc.getElementById(id);
+            if (el) {{
+              el.scrollIntoView({{ behavior: "smooth", block: "start" }});
+              return true;
+            }}
+            return false;
+          }}
+          if (!go()) {{
+            let attempts = 0;
+            const timer = setInterval(function() {{
+              if (go() || ++attempts > 50) clearInterval(timer);
+            }}, 120);
+          }}
+        }})();
+        </script>
+        """,
+        height=0,
+    )
 
 
 def _risk_filter_label(option: str, counts: dict[str, int], total: int) -> str:

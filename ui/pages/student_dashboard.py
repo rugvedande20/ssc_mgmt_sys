@@ -3,10 +3,10 @@ import streamlit as st
 from config.school_context import FUTURE_SCOPE_NOTE, PROFILE_FIELD_LABELS, format_class
 from src.db.database import get_db_session
 from src.services.student_service import get_student_dashboard_payload
-from src.utils.helpers import is_student_profile_complete, parse_json_list, profile_completeness_percent
+from src.utils.helpers import is_student_profile_complete, profile_completeness_percent
 from ui.components.common import render_profile_completeness, render_student_next_steps
 from ui.components.layout import section
-from ui.components.page_chrome import render_highlight_panel, render_page_header, render_snapshot_grid
+from ui.components.page_chrome import render_page_header, render_snapshot_grid
 
 
 def render(current_user: dict) -> None:
@@ -23,7 +23,7 @@ def render(current_user: dict) -> None:
 
     render_page_header(
         "My Dashboard",
-        f"Your journey through profile, interests, and early career ideas. {FUTURE_SCOPE_NOTE}",
+        f"Your journey through profile, interests, and career guidance. {FUTURE_SCOPE_NOTE}",
         badge_text="Student",
         badge_variant="sky",
     )
@@ -51,38 +51,11 @@ def render(current_user: dict) -> None:
                     (PROFILE_FIELD_LABELS["internet_access"], profile["internet_access"] or "—"),
                 ]
             )
-            if not profile_complete:
-                st.caption("Update **Profile** anytime if your interests or school details change.")
+            col_a, col_b = st.columns(2)
+            if col_a.button("Edit profile", type="primary", use_container_width=True):
+                st.session_state["profile_edit_mode"] = True
+                st.session_state["nav_page"] = "Profile"
+                st.rerun()
+            col_b.caption("Update class, income bracket, interests, and more on your profile page.")
         else:
             st.warning("Your profile is not set up yet.")
-
-    with section(
-        "Latest interest assessment",
-        "Summary from your most recent RIASEC-style questionnaire.",
-    ):
-        if latest_assessment:
-            render_highlight_panel(
-                "Your interest profile",
-                latest_assessment["summary"],
-                variant="violet",
-                icon="✨",
-            )
-            st.caption(f"Top interest areas: {latest_assessment['top_codes']}")
-        else:
-            st.info("Take the **Interest Assessment** from the sidebar when you are ready.")
-
-    with section("Career ideas for you", "Early pathways matched to your profile (demo preview)."):
-        if recommendations:
-            st.caption("Sample ideas for now — personalized recommendations are coming next.")
-            for recommendation in recommendations:
-                skills = parse_json_list(recommendation["skill_gap"])
-                activities = parse_json_list(recommendation["certifications"])
-                st.markdown(f"**{recommendation['career_name']}** — {recommendation['match_score']:.0f}% match")
-                st.write(recommendation["rationale"])
-                if skills:
-                    st.caption(f"Skills to build: {', '.join(skills)}")
-                if activities:
-                    st.caption(f"Activities to try: {', '.join(activities)}")
-                st.divider()
-        else:
-            st.info("Career ideas appear after you complete your profile and interest assessment.")

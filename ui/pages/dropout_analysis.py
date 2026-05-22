@@ -9,14 +9,21 @@ from src.services.dropout_service import (
 )
 from ui.components.charts import risk_distribution_chart
 from ui.components.layout import section, show_plotly_chart
+from ui.components.page_chrome import render_page_header
 from ui.components.model_evaluation import render_model_metrics_table
-from ui.components.risk_display import render_risk_explanations_section
+from ui.components.risk_display import render_risk_explanations_section, scroll_to_risk_explanations
 from ui.components.tables import show_dataframe
 
 
-def render() -> None:
-    st.header("Dropout Analysis")
-    st.caption("Train the model once, then score the latest record for each Class 6–10 student.")
+def render(current_user: dict | None = None) -> None:
+    focus_risk = st.session_state.pop("focus_risk_explanations", False)
+
+    render_page_header(
+        "Dropout Analysis",
+        "Train the model once, then score the latest record for each Class 6–10 student.",
+        badge_text="Admin",
+        badge_variant="indigo",
+    )
 
     model_status = get_dropout_model_status()
 
@@ -26,7 +33,8 @@ def render() -> None:
             if model_status.get("available"):
                 st.success("Model ready")
                 render_model_metrics_table(model_status)
-                st.caption(f"Last trained: {model_status.get('trained_at', '-')}")
+                trained = model_status.get("trained_at", "-")
+                st.caption(f"Last trained: {trained}")
             else:
                 st.warning("No model trained yet.")
 
@@ -59,7 +67,7 @@ def render() -> None:
         st.info("No predictions yet. Train the model and run predictions.")
         return
 
-    with section("Latest predictions", "Summary table and risk distribution."):
+    with section("Latest predictions", "Summary table and risk distribution chart."):
         show_dataframe(
             latest_predictions,
             columns=["student_name", "username", "risk_score", "risk_level", "predicted_at"],
@@ -70,3 +78,6 @@ def render() -> None:
 
     st.divider()
     render_risk_explanations_section(latest_predictions, section_key="dropout_risk_expl")
+
+    if focus_risk:
+        scroll_to_risk_explanations()

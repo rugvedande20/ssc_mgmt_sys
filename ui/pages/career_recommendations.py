@@ -2,6 +2,7 @@ import streamlit as st
 
 from config.school_context import FUTURE_SCOPE_NOTE
 from src.db.database import get_db_session
+from src.services.career_recommendation_service import generate_career_guidance, get_student_career_payload
 from src.services.student_service import get_student_dashboard_payload, get_student_profile_payload
 from src.utils.helpers import is_student_profile_complete, parse_json_list
 from ui.components.layout import section
@@ -11,8 +12,8 @@ from ui.components.page_chrome import render_career_card, render_highlight_panel
 def render(current_user: dict) -> None:
     render_page_header(
         "Career Ideas & Pathways",
-        f"Explore careers that may suit your interests (Class 6–10). {FUTURE_SCOPE_NOTE}",
-        badge_text="Explorer",
+        f"Your future-oriented career guidance report. {FUTURE_SCOPE_NOTE}",
+        badge_text="Future-fit",
         badge_variant="violet",
     )
 
@@ -26,27 +27,82 @@ def render(current_user: dict) -> None:
                 icon="!",
             )
             return
-        payload = get_student_dashboard_payload(session, current_user["id"])
+        dashboard = get_student_dashboard_payload(session, current_user["id"])
+        career_payload = get_student_career_payload(session, current_user["id"])
 
-    recommendations = payload["recommendations"]
-    latest_assessment = payload["latest_assessment"]
+    latest_assessment = dashboard.get("latest_assessment")
+    snapshot = career_payload.get("snapshot")
+    recommendations = career_payload.get("recommendations") or []
+    has_report = snapshot is not None
 
-    if not latest_assessment:
+    with section(
+        "Generate your career guidance",
+        "Uses your Interest Assessment, academic records, profile, and 5-year labour outlook.",
+    ):
+        if not latest_assessment:
+            st.info("Complete the **Interest Assessment** first, then return here to generate your report.")
+        elif not has_report:
+            if st.button("Generate career guidance report", type="primary", use_container_width=True):
+                try:
+                    with get_db_session() as session:
+                        generate_career_guidance(session, current_user["id"])
+                    st.success("Report saved below.")
+                    st.rerun()
+                except ValueError as exc:
+                    st.error(str(exc))
+        else:
+            st.caption("Re-run when your class or marks change to refresh matches.")
+            if st.button("Refresh career guidance report", type="primary", use_container_width=True):
+                try:
+                    with get_db_session() as session:
+                        generate_career_guidance(session, current_user["id"])
+                    st.success("Report updated.")
+                    st.rerun()
+                except ValueError as exc:
+                    st.error(str(exc))
+
+    if not has_report:
         render_highlight_panel(
-            "Interest assessment needed",
-            "Complete the interest assessment so future career ideas can use your profile.",
+            "No report yet",
+            "Generate your career guidance report using the button above (after Interest Assessment).",
             variant="sky",
             icon="◆",
         )
-    else:
-        render_highlight_panel(
-            "You're on track",
-            "Personalized career matching is coming next — preview sample ideas below.",
-            variant="emerald",
-            icon="✓",
-        )
+        return
 
-    with section("Career matches (preview)", "Demo suggestions — real engine connects in the next milestone."):
+    render_highlight_panel(
+        "Your career guidance report",
+        snapshot["summary"],
+        variant="emerald",
+        icon="✓",
+    )
+    st.caption(f"Generated {snapshot['generated_at']} · Class {snapshot.get('student_class') or '—'}")
+
+    report = snapshot.get("report") or {}
+    if snapshot.get("phase") == "class_10_report" and report.get("class_10"):
+        c10 = report["class_10"]
+        with section("Class 10 transition report", "Concrete suggestions before choosing Class 11–12."):
+            st.write(c10.get("summary", ""))
+            if c10.get("top_career"):
+                st.metric("Strongest future-fit pathway", c10["top_career"])
+            if c10.get("stream_recommendations"):
+                st.markdown("**Suggested streams**")
+                for item in c10["stream_recommendations"]:
+                    st.markdown(f"- **{item['stream']}** — {item['reason']}")
+            if c10.get("next_steps"):
+                st.markdown("**What to do next**")
+                for step in c10["next_steps"]:
+                    st.markdown(f"- {step}")
+
+    rising = (report.get("meta") or {}).get("rising_sectors") or []
+    if rising:
+        with section("Jobs & fields rising (next 5 years)", "Labour outlook used in your match scores."):
+            for sector in rising[:4]:
+                pct = round(float(sector.get("growth_rate", 0)) * 100)
+                st.markdown(f"**{sector['name']}** — projected demand signal ~{pct}%")
+                st.progress(min(1.0, float(sector.get("growth_rate", 0))))
+
+    with section("Your career matches", "Ranked by interest fit, academics, and future job demand."):
         if recommendations:
             for recommendation in recommendations:
                 render_career_card(
@@ -54,17 +110,19 @@ def render(current_user: dict) -> None:
                     match_score=recommendation["match_score"],
                     rationale=recommendation["rationale"],
                     skills=parse_json_list(recommendation["skill_gap"]),
-                    activities=parse_json_list(recommendation["certifications"]),
+                    activities=parse_json_list(recommendation.get("certifications")),
                 )
+                if recommendation.get("roadmap"):
+                    with st.expander(f"Roadmap — {recommendation['career_name']}"):
+                        st.write(recommendation["roadmap"])
         else:
-            st.info("No career ideas are stored for your account yet.")
+            st.info("No career matches in this report.")
 
-    with section("Coming next", "What the full career module will include."):
-        st.markdown(
-            """
-            - Career ideas matched to your interests and school marks
-            - Simple learning roadmaps (subjects, clubs, projects)
-            - Activities and courses to try at your age
-            - Later: Class 11–12 stream guidance and market trends
-            """
-        )
+    history = career_payload.get("history") or []
+    if len(history) > 1:
+        with section("Past reports", "Earlier guidance saved when you generated again."):
+            for item in history:
+                st.caption(
+                    f"{item['generated_at']} · Class {item.get('student_class') or '—'} · {item['phase']}"
+                )
+                st.write(item["summary"])

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 
 import joblib
 import numpy as np
@@ -12,6 +11,8 @@ from sklearn.impute import SimpleImputer
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+from src.utils.datetime_ist import now_ist
 
 from config.settings import settings
 from src.ml.evaluation import (
@@ -103,7 +104,7 @@ def train_and_save_dropout_model(random_state: int = 42) -> dict:
     risk_thresholds = derive_risk_thresholds(probabilities)
 
     metadata = {
-        "trained_at": datetime.now(timezone.utc).isoformat(),
+        "trained_at": now_ist().isoformat() + "+05:30",
         "dataset_type": "synthetic_baseline",
         "train_size": int(len(train_df)),
         "test_size": int(len(test_df)),

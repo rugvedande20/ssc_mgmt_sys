@@ -1,0 +1,136 @@
+{
+  "careers": [
+    {
+      "id": "software_data",
+      "name": "Software & Data Professional",
+      "sectors": ["digital_tech"],
+      "riasec_profile": {"Realistic": 0.35, "Investigative": 0.9, "Artistic": 0.4, "Social": 0.35, "Enterprising": 0.5, "Conventional": 0.65},
+      "min_marks_pct": 70,
+      "min_attendance_pct": 80,
+      "skills": ["Mathematics", "Logical thinking", "Programming basics", "English communication"],
+      "certifications": ["Scratch/Python club", "Olympiad maths", "Online CS50 or Khan Academy CS"],
+      "roadmap": "Strengthen maths and science → learn programming in Class 8–10 → explore JEE/entrance or B.Tech CS/Data Science after 10th."
+    },
+    {
+      "id": "healthcare",
+      "name": "Doctor / Healthcare Professional",
+      "sectors": ["healthcare"],
+      "riasec_profile": {"Realistic": 0.55, "Investigative": 0.85, "Artistic": 0.2, "Social": 0.9, "Enterprising": 0.35, "Conventional": 0.6},
+      "min_marks_pct": 75,
+      "min_attendance_pct": 85,
+      "skills": ["Biology", "Chemistry", "Empathy", "Discipline"],
+      "certifications": ["Science club", "First-aid workshop", "Biology olympiad prep"],
+      "roadmap": "Excel in PCB → NEET-oriented foundation from Class 9–10 → MBBS/nursing/allied health pathways."
+    },
+    {
+      "id": "green_tech",
+      "name": "Green Energy & Sustainability Technician",
+      "sectors": ["green_energy"],
+      "riasec_profile": {"Realistic": 0.85, "Investigative": 0.65, "Artistic": 0.25, "Social": 0.45, "Enterprising": 0.4, "Conventional": 0.55},
+      "min_marks_pct": 60,
+      "min_attendance_pct": 75,
+      "skills": ["Physics", "Environmental science", "Hands-on projects", "Safety practices"],
+      "certifications": ["Science fair projects", "Eco-club", "Basic electronics workshop"],
+      "roadmap": "Physics + environmental projects → ITI/polytechnic or B.Tech renewable energy after 10th."
+    },
+    {
+      "id": "teacher_educator",
+      "name": "Teacher / Educator",
+      "sectors": ["education_services"],
+      "riasec_profile": {"Realistic": 0.3, "Investigative": 0.55, "Artistic": 0.5, "Social": 0.95, "Enterprising": 0.45, "Conventional": 0.7},
+      "min_marks_pct": 65,
+      "min_attendance_pct": 80,
+      "skills": ["Communication", "Subject mastery", "Patience", "Presentation"],
+      "certifications": ["Peer tutoring", "Debate club", "Subject olympiads"],
+      "roadmap": "Build strong fundamentals in favourite subjects → B.Ed / subject degree → teaching certification."
+    },
+    {
+      "id": "creative_designer",
+      "name": "Designer / Creative Media Professional",
+      "sectors": ["creative_media"],
+      "riasec_profile": {"Realistic": 0.35, "Investigative": 0.45, "Artistic": 0.95, "Social": 0.5, "Enterprising": 0.55, "Conventional": 0.4},
+      "min_marks_pct": 55,
+      "min_attendance_pct": 70,
+      "skills": ["Visual arts", "Storytelling", "Digital tools", "Portfolio building"],
+      "certifications": ["Art club", "Canva/Figma basics", "Short film or design projects"],
+      "roadmap": "Portfolio from Class 7–10 → design/animation degree or diploma → studio or freelance work."
+    },
+    {
+      "id": "entrepreneur",
+      "name": "Entrepreneur / Business Leader",
+      "sectors": ["business_finance"],
+      "riasec_profile": {"Realistic": 0.4, "Investigative": 0.55, "Artistic": 0.45, "Social": 0.65, "Enterprising": 0.95, "Conventional": 0.55},
+      "min_marks_pct": 60,
+      "min_attendance_pct": 75,
+      "skills": ["Communication", "Planning", "Basic finance", "Team leadership"],
+      "certifications": ["School enterprise club", "Pitch competitions", "Young CEO workshops"],
+      "roadmap": "Lead school projects → commerce/entrepreneurship stream → BBA/startup incubation."
+    },
+    {
+      "id": "finance_ca",
+      "name": "Chartered Accountant / Finance Analyst",
+      "sectors": ["business_finance"],
+      "riasec_profile": {"Realistic": 0.25, "Investigative": 0.7, "Artistic": 0.2, "Social": 0.4, "Enterprising": 0.65, "Conventional": 0.95},
+      "min_marks_pct": 72,
+      "min_attendance_pct": 82,
+      "skills": ["Mathematics", "Accountancy basics", "Attention to detail", "Ethics"],
+      "certifications": ["Maths club", "Commerce foundation courses", "Financial literacy workshops"],
+      "roadmap": "Commerce stream after 10th → CA/CMA/CFA track with strong maths."
+    },
+    {
+      "id": "civil_engineer",
+      "name": "Civil / Infrastructure Engineer",
+      "sectors": ["infrastructure"],
+      "riasec_profile": {"Realistic": 0.9, "Investigative": 0.7, "Artistic": 0.3, "Social": 0.4, "Enterprising": 0.45, "Conventional": 0.65},
+      "min_marks_pct": 68,
+      "min_attendance_pct": 78,
+      "skills": ["Mathematics", "Physics", "Drawing/spatial skills", "Project planning"],
+      "certifications": ["Model building", "Science projects", "CAD basics workshops"],
+      "roadmap": "PCM stream → JEE/state engineering → civil or infrastructure specialisation."
+    },
+    {
+      "id": "psychologist_counsellor",
+      "name": "Psychologist / Counsellor",
+      "sectors": ["social_wellbeing", "healthcare"],
+      "riasec_profile": {"Realistic": 0.2, "Investigative": 0.65, "Artistic": 0.4, "Social": 0.95, "Enterprising": 0.35, "Conventional": 0.5},
+      "min_marks_pct": 62,
+      "min_attendance_pct": 78,
+      "skills": ["Listening", "Empathy", "Biology/psychology interest", "Ethics"],
+      "certifications": ["Peer support groups", "Mental health awareness camps", "Debate & empathy workshops"],
+      "roadmap": "Psychology in 11–12 → BA Psychology → clinical or counselling certification."
+    },
+    {
+      "id": "digital_marketer",
+      "name": "Digital Marketing / Content Strategist",
+      "sectors": ["creative_media", "digital_tech"],
+      "riasec_profile": {"Realistic": 0.25, "Investigative": 0.5, "Artistic": 0.75, "Social": 0.7, "Enterprising": 0.85, "Conventional": 0.5},
+      "min_marks_pct": 58,
+      "min_attendance_pct": 72,
+      "skills": ["Writing", "Creativity", "Analytics basics", "Social media literacy"],
+      "certifications": ["School newsletter", "YouTube/blog project", "Google Digital Garage (age-appropriate)"],
+      "roadmap": "Build content portfolio → marketing/communications degree or diploma."
+    },
+    {
+      "id": "sports_coach",
+      "name": "Sports & Fitness Professional",
+      "sectors": ["education_services", "healthcare"],
+      "riasec_profile": {"Realistic": 0.85, "Investigative": 0.35, "Artistic": 0.35, "Social": 0.75, "Enterprising": 0.5, "Conventional": 0.45},
+      "min_marks_pct": 50,
+      "min_attendance_pct": 75,
+      "skills": ["Physical fitness", "Teamwork", "Discipline", "Nutrition awareness"],
+      "certifications": ["School sports teams", "NIS/youth sports camps", "Fitness first-aid basics"],
+      "roadmap": "Excel in sport → physical education degree / coaching licenses."
+    },
+    {
+      "id": "public_admin",
+      "name": "Public Service / Civil Services",
+      "sectors": ["social_wellbeing", "education_services"],
+      "riasec_profile": {"Realistic": 0.3, "Investigative": 0.6, "Artistic": 0.25, "Social": 0.85, "Enterprising": 0.55, "Conventional": 0.85},
+      "min_marks_pct": 70,
+      "min_attendance_pct": 85,
+      "skills": ["General knowledge", "Writing", "Ethics", "Leadership"],
+      "certifications": ["Quiz clubs", "Model UN", "Debate & essay competitions"],
+      "roadmap": "Strong humanities + current affairs → UPSC/state PSC foundation from 11–12."
+    }
+  ]
+}

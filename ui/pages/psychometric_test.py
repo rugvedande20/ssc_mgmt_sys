@@ -13,6 +13,12 @@ from src.services.psychometric_service import (
 )
 from ui.components.layout import section, show_plotly_chart
 from ui.components.page_chrome import render_highlight_panel, render_page_header
+from ui.components.psychometric_display import (
+    render_assessment_invite,
+    render_likert_legend,
+    render_riasec_trail,
+    render_section_hero,
+)
 from ui.components.tables import show_dataframe
 
 
@@ -36,15 +42,18 @@ def _render_assessment_flow(student_id: int) -> None:
     total_questions = len(question_bank)
     answered_count = len(st.session_state.psychometric_responses)
 
+    render_riasec_trail(step)
+
+    progress_pct = answered_count / total_questions if total_questions else 0
     st.progress(
-        (step + 1) / len(categories),
-        text=f"Section {step + 1} of {len(categories)}: {category}",
+        progress_pct,
+        text=f"{answered_count} of {total_questions} answered · Section {step + 1}/{len(categories)}",
     )
-    st.caption(f"Progress: {answered_count} of {total_questions} questions saved across all sections.")
+
+    render_section_hero(category, step + 1, len(categories), len(section_questions))
+    render_likert_legend()
 
     with st.form(f"psychometric_section_{step}"):
-        st.markdown(f"### {category}")
-        st.caption("Rate how much each statement describes you.")
         section_responses: dict[str, int] = {}
         for question in section_questions:
             current_value = st.session_state.psychometric_responses.get(question["id"])
@@ -58,11 +67,11 @@ def _render_assessment_flow(student_id: int) -> None:
                 key=f"psych_{question['id']}_{step}",
             )
 
-        nav_prev, nav_next, nav_reset = st.columns((1, 1.2, 1))
+        nav_prev, nav_next, nav_reset = st.columns((1, 1.4, 1))
         previous_clicked = nav_prev.form_submit_button("← Previous", disabled=step == 0)
-        next_label = "Next →" if step < len(categories) - 1 else "Submit Assessment"
-        next_clicked = nav_next.form_submit_button(next_label, use_container_width=True)
-        reset_clicked = nav_reset.form_submit_button("Reset")
+        next_label = "Next section →" if step < len(categories) - 1 else "Submit & see results ✨"
+        next_clicked = nav_next.form_submit_button(next_label, use_container_width=True, type="primary")
+        reset_clicked = nav_reset.form_submit_button("Start over")
 
     if reset_clicked:
         _reset_psychometric_state()
@@ -80,13 +89,13 @@ def _render_assessment_flow(student_id: int) -> None:
             st.rerun()
 
         if len(st.session_state.psychometric_responses) < total_questions:
-            st.error("Please complete every section before submitting.")
+            st.error("Please answer every statement in each section before submitting.")
             return
 
         with get_db_session() as session:
             save_psychometric_attempt(session, student_id, st.session_state.psychometric_responses)
         _reset_psychometric_state()
-        st.success("Psychometric assessment submitted successfully.")
+        st.success("Nice work! Your interest profile is saved.")
         st.rerun()
 
 
@@ -98,23 +107,26 @@ def render(current_user: dict) -> None:
         profile = get_student_profile_payload(session, current_user["id"])
     if not is_student_profile_complete(profile):
         render_page_header(
-            "Interest & Strength Assessment",
-            "Complete your school profile first to unlock this assessment.",
+            "Interest Assessment",
+            "Complete your school profile first to unlock this fun quiz.",
             badge_text="Locked",
             badge_variant="amber",
         )
         render_highlight_panel(
             "Profile required",
-            "Open **Complete Profile** from the menu, then return here.",
+            "Open **Complete Profile** from the menu, then come back here.",
             variant="amber",
             icon="!",
         )
         return
 
+    question_bank = get_question_bank()
+    total_questions = len(question_bank)
+
     render_page_header(
-        "Interest & Strength Assessment",
-        "A short RIASEC-style questionnaire — discover subjects and activities you enjoy (Class 6–10).",
-        badge_text="RIASEC",
+        "Interest Assessment",
+        "Discover what subjects and activities fit you best — a quick, no-pressure quiz.",
+        badge_text="~12 min",
         badge_variant="violet",
     )
 
@@ -122,11 +134,14 @@ def render(current_user: dict) -> None:
         latest_attempt = get_latest_attempt_payload(session, current_user["id"])
         recent_attempts = list_recent_attempts(session, current_user["id"], limit=5)
 
+    if not latest_attempt:
+        render_assessment_invite(minutes=12, question_count=total_questions)
+
     latest_scores = latest_attempt["score_map"] if latest_attempt else {}
     if latest_attempt:
-        with section("Your latest results", "Saved assessment summary and interest chart."):
+        with section("Your interest profile", "Based on your latest completed assessment."):
             render_highlight_panel(
-                "Assessment complete",
+                "Your top interests",
                 latest_attempt["summary"],
                 variant="emerald",
                 icon="✓",
@@ -136,18 +151,24 @@ def render(current_user: dict) -> None:
                 chart_df = pd.DataFrame(
                     [{"Category": category, "Score": score} for category, score in latest_scores.items()]
                 ).sort_values("Score", ascending=False)
-                chart = px.bar(chart_df, x="Category", y="Score", color="Category", title="Your Interest Profile")
+                chart = px.bar(
+                    chart_df,
+                    x="Category",
+                    y="Score",
+                    color="Category",
+                    title="Your interest profile",
+                )
+                chart.update_layout(font=dict(size=13), title_font_size=15)
                 show_plotly_chart(chart, key="psychometric_interest_chart")
 
     with section(
-        "Take or retake the assessment",
-        "Six short sections — rate how much each statement describes you.",
+        "Take the quiz" if not latest_attempt else "Retake the quiz",
+        "Six colourful sections — be honest, there are no wrong answers.",
     ):
-        with st.expander("Open questionnaire", expanded=not latest_attempt):
-            _render_assessment_flow(current_user["id"])
+        _render_assessment_flow(current_user["id"])
 
-    with section("Recent attempts", "Your last five submissions."):
+    with section("Past attempts", "Your previous submissions."):
         if recent_attempts:
             show_dataframe(recent_attempts)
         else:
-            st.info("No assessment attempts found yet.")
+            st.info("Your first attempt will show up here after you submit.")

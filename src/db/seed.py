@@ -3,6 +3,7 @@ from sqlalchemy import delete, select
 from src.auth.hashing import hash_password
 from src.db.models import (
     AcademicRecord,
+    CareerGuidanceSnapshot,
     CareerRecommendation,
     DropoutPrediction,
     InterventionLog,
@@ -24,6 +25,7 @@ def remove_legacy_demo_student(session) -> None:
     student_id = user.id
     session.execute(delete(InterventionLog).where(InterventionLog.student_id == student_id))
     session.execute(delete(CareerRecommendation).where(CareerRecommendation.student_id == student_id))
+    session.execute(delete(CareerGuidanceSnapshot).where(CareerGuidanceSnapshot.student_id == student_id))
     session.execute(delete(PsychometricAttempt).where(PsychometricAttempt.student_id == student_id))
     session.execute(delete(DropoutPrediction).where(DropoutPrediction.student_id == student_id))
     session.execute(delete(AcademicRecord).where(AcademicRecord.student_id == student_id))

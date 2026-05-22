@@ -65,6 +65,18 @@ def apply_schema_patches(engine) -> None:
     """Add columns introduced after first deploy (SQLite has no automatic migrations)."""
     patches = [
         "ALTER TABLE users ADD COLUMN created_by_admin_id INTEGER REFERENCES users(id)",
+        """CREATE TABLE IF NOT EXISTS career_guidance_snapshots (
+            id INTEGER PRIMARY KEY,
+            student_id INTEGER NOT NULL,
+            student_class INTEGER,
+            phase VARCHAR(32) NOT NULL,
+            summary TEXT NOT NULL,
+            report_json TEXT NOT NULL,
+            labour_horizon_years INTEGER NOT NULL DEFAULT 5,
+            generated_at DATETIME NOT NULL,
+            FOREIGN KEY(student_id) REFERENCES users(id)
+        )""",
+        "ALTER TABLE career_recommendations ADD COLUMN guidance_snapshot_id INTEGER REFERENCES career_guidance_snapshots(id)",
     ]
     with engine.connect() as connection:
         with connection.begin():

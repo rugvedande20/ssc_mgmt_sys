@@ -4,7 +4,9 @@ from typing import Any
 
 from sqlalchemy import desc, func, select
 
+from config.school_context import income_band_for_dropout_model
 from src.db.models import AcademicRecord, DropoutPrediction, StudentProfile, User
+from src.utils.datetime_ist import format_datetime_ist
 
 EXCLUDED_STUDENT_NAME = "Rahul Verma"
 
@@ -85,33 +87,30 @@ def run_predictions_for_latest_records(session) -> list[dict[str, Any]]:
     candidates = build_prediction_candidates(session)
     if not candidates:
         return []
-    prediction_inputs = [
-        {
-            key: value
-            for key, value in candidate.items()
-            if key
-            in {
-                "attendance_percentage",
-                "cgpa",
-                "internal_marks",
-                "backlog_count",
-                "fee_pending",
-                "scholarship_status",
-                "extracurricular_participation",
-                "disciplinary_issues",
-                "engagement_score",
-                "stress_level",
-                "age",
-                "semester",
-                "family_income_band",
-                "parental_education",
-                "travel_distance_km",
-                "internet_access",
-                "department",
-            }
-        }
-        for candidate in candidates
-    ]
+    feature_keys = {
+        "attendance_percentage",
+        "cgpa",
+        "internal_marks",
+        "backlog_count",
+        "fee_pending",
+        "scholarship_status",
+        "extracurricular_participation",
+        "disciplinary_issues",
+        "engagement_score",
+        "stress_level",
+        "age",
+        "semester",
+        "family_income_band",
+        "parental_education",
+        "travel_distance_km",
+        "internet_access",
+        "department",
+    }
+    prediction_inputs = []
+    for candidate in candidates:
+        row = {key: candidate[key] for key in feature_keys if key in candidate}
+        row["family_income_band"] = income_band_for_dropout_model(candidate.get("family_income_band"))
+        prediction_inputs.append(row)
     predictions = predict_dropout_batch(prediction_inputs)
     results = []
     for candidate, prediction in zip(candidates, predictions):
@@ -130,7 +129,7 @@ def run_predictions_for_latest_records(session) -> list[dict[str, Any]]:
                 "risk_score": round(prediction["risk_score"] * 100, 1),
                 "risk_level": prediction["risk_level"],
                 "top_factors": explanation,
-                "recorded_at": candidate["latest_recorded_at"].strftime("%Y-%m-%d %H:%M"),
+                "recorded_at": format_datetime_ist(candidate["latest_recorded_at"]),
             }
         )
     session.flush()
@@ -151,7 +150,7 @@ def list_recent_predictions(session, limit: int = 50) -> list[dict[str, Any]]:
             "risk_score": round(row.risk_score * 100, 1),
             "risk_level": row.risk_level,
             "top_factors": row.top_factors,
-            "predicted_at": row.predicted_at.strftime("%Y-%m-%d %H:%M"),
+            "predicted_at": format_datetime_ist(row.predicted_at),
         }
         for row in rows
     ]
@@ -198,7 +197,7 @@ def list_latest_predictions_per_student(session, limit: int = 100) -> list[dict[
             "risk_score": round(row.risk_score * 100, 1),
             "risk_level": row.risk_level,
             "top_factors": row.top_factors,
-            "predicted_at": row.predicted_at.strftime("%Y-%m-%d %H:%M"),
+            "predicted_at": format_datetime_ist(row.predicted_at),
         }
         for row in rows
     ]

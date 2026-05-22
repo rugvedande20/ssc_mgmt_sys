@@ -5,7 +5,7 @@ from typing import Any
 import streamlit as st
 
 from config.constants import TARGET_GRADE_MAX, TARGET_GRADE_MIN
-from config.school_context import GRADE_LABELS, PROFILE_FIELD_LABELS
+from config.school_context import FAMILY_INCOME_BRACKETS, GRADE_LABELS, PROFILE_FIELD_LABELS
 from ui.components.page_chrome import render_form_section_header
 from src.db.database import get_db_session
 from src.services.student_service import upsert_student_profile
@@ -26,7 +26,7 @@ def render_student_profile_form(
     grade_options = list(range(TARGET_GRADE_MIN, TARGET_GRADE_MAX + 1))
     grade_labels = [GRADE_LABELS[g] for g in grade_options]
     gender_options = ["", "Female", "Male", "Non-binary", "Prefer not to say"]
-    income_options = ["", "Low", "Middle", "Upper Middle", "High"]
+    income_options = list(FAMILY_INCOME_BRACKETS)
     education_options = ["", "Up to Class 10", "Graduate", "Postgraduate", "Other"]
     internet_options = ["", "Yes", "No", "Limited"]
 

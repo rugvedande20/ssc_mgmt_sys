@@ -19,6 +19,7 @@ from src.services.student_service import (
     list_student_options,
 )
 from ui.components.layout import section
+from ui.components.page_chrome import render_page_header
 from ui.components.tables import show_dataframe
 
 
@@ -26,8 +27,8 @@ def _render_import_results(result: dict) -> None:
     failed = len(result["row_errors"])
     st.success(
         f"Processed **{result['total_rows']}** row(s): "
-        f"**{result['students_created']}** new student account(s) created, "
-        f"**{result['records_imported']}** academic record(s) saved."
+        f"**{result['records_imported']}** academic record(s) saved for matched students, "
+        f"**{result['students_created']}** new account(s) created where needed."
     )
     if result["existing_accounts_used"]:
         st.info(
@@ -55,9 +56,11 @@ def _render_import_results(result: dict) -> None:
 
 
 def render(current_user: dict) -> None:
-    st.header("Academic Data Upload")
-    st.caption(
-        f"Term-wise marks and attendance for Class {TARGET_GRADE_MIN}–{TARGET_GRADE_MAX}. {FUTURE_SCOPE_NOTE}"
+    render_page_header(
+        "Academic Data Upload",
+        f"Bulk upload for all students — term-wise marks and attendance (Class {TARGET_GRADE_MIN}–{TARGET_GRADE_MAX}). {FUTURE_SCOPE_NOTE}",
+        badge_text="Admin",
+        badge_variant="indigo",
     )
 
     admin_id = current_user["id"] if current_user.get("role") == "admin" else None
@@ -139,14 +142,18 @@ def render(current_user: dict) -> None:
     else:
         st.info("No students linked to your account yet — bulk import below will create them.")
 
-    with section("Bulk import", "Upload CSV or Excel to create accounts and records in one step."):
+    with section(
+        "Upload academic details for all students",
+        "One Excel/CSV file — each row updates that student's academic data (and creates an account only if missing).",
+    ):
         st.markdown(
             """
-            **Every row creates a student account** (if one does not already exist), then saves academic data.
+            **One file for the whole school cohort.** Each row must include `student_username` so the system
+            knows which student to update. Existing students get a **new academic snapshot** from that row;
+            new usernames get a student account plus their first academic record.
 
-            - `student_username` column: `firstname_lastname` (e.g. `aarav_patil`)
-            - **Login:** first 3 letters of first name + first 3 of last name (e.g. `aarpat`)
-            - **Password:** username + `@123` (e.g. `aarpat@123`)
+            - `student_username`: `firstname_lastname` (e.g. `aarav_patil`) — must match the student's login slug
+            - **New accounts:** login = first 3 letters of first name + first 3 of last name (e.g. `aarpat`), password = username + `@123`
             - Students are linked to **you** as the admin who imported the file
             """
         )
@@ -189,7 +196,7 @@ def render(current_user: dict) -> None:
                 show_dataframe(csv_frame.head(10))
 
             if csv_frame is not None and st.button(
-                "Import all records & create student accounts",
+                "Import file — update all students",
                 use_container_width=True,
                 type="primary",
             ):

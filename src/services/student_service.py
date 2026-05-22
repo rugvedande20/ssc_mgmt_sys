@@ -27,7 +27,16 @@ def _format_class_label(grade: int | None) -> str:
     if grade is None:
         return "—"
     return format_class(int(grade))
-from src.db.models import AcademicRecord, CareerRecommendation, DropoutPrediction, PsychometricAttempt, StudentProfile, User
+from src.utils.datetime_ist import format_datetime_ist
+from src.db.models import (
+    AcademicRecord,
+    CareerGuidanceSnapshot,
+    CareerRecommendation,
+    DropoutPrediction,
+    PsychometricAttempt,
+    StudentProfile,
+    User,
+)
 
 
 PROFILE_DEFAULTS = {
@@ -230,7 +239,7 @@ def list_recent_academic_records(session, limit: int = 50) -> list[dict[str, Any
             "attendance_percentage": row.attendance_percentage,
             "overall_marks_pct": row.cgpa,
             "subjects_below_passing": row.backlog_count,
-            "recorded_at": row.recorded_at.strftime("%Y-%m-%d %H:%M"),
+            "recorded_at": format_datetime_ist(row.recorded_at),
         }
         for row in rows
     ]
@@ -286,7 +295,7 @@ def list_students_with_latest_records(session) -> list[dict[str, Any]]:
             "attendance_percentage": row.attendance_percentage,
             "overall_marks_pct": row.cgpa,
             "subjects_below_passing": row.backlog_count,
-            "recorded_at": row.recorded_at.strftime("%Y-%m-%d %H:%M"),
+            "recorded_at": format_datetime_ist(row.recorded_at),
         }
         for row in rows
     ]
@@ -313,12 +322,9 @@ def get_student_dashboard_payload(session, user_id: int) -> dict[str, Any]:
         .where(PsychometricAttempt.student_id == user_id)
         .order_by(desc(PsychometricAttempt.submitted_at))
     )
-    recommendation_rows = session.execute(
-        select(CareerRecommendation)
-        .where(CareerRecommendation.student_id == user_id)
-        .order_by(CareerRecommendation.match_score.desc())
-        .limit(3)
-    ).scalars()
+    from src.services.career_recommendation_service import get_student_career_payload
+
+    career_payload = get_student_career_payload(session, user_id)
 
     latest_assessment = None
     if latest_assessment_row:
@@ -327,21 +333,13 @@ def get_student_dashboard_payload(session, user_id: int) -> dict[str, Any]:
             "top_codes": latest_assessment_row.top_codes,
         }
 
-    recommendations = [
-        {
-            "career_name": row.career_name,
-            "match_score": row.match_score,
-            "rationale": row.rationale,
-            "skill_gap": row.skill_gap,
-            "certifications": row.certifications,
-        }
-        for row in recommendation_rows
-    ]
+    recommendations = career_payload["recommendations"][:5]
 
     return {
         "profile": profile,
         "latest_assessment": latest_assessment,
         "recommendations": recommendations,
+        "career_guidance": career_payload,
     }
 
 
@@ -390,7 +388,7 @@ def get_student_overview(session, student_id: int) -> dict[str, Any] | None:
             "subjects_below_passing": latest_record.backlog_count,
             "engagement_score": latest_record.engagement_score,
             "stress_level": latest_record.stress_level,
-            "recorded_at": latest_record.recorded_at.strftime("%Y-%m-%d %H:%M"),
+            "recorded_at": format_datetime_ist(latest_record.recorded_at),
         },
         "latest_prediction": None
         if not latest_prediction
@@ -398,16 +396,22 @@ def get_student_overview(session, student_id: int) -> dict[str, Any] | None:
             "risk_score": round(latest_prediction.risk_score * 100, 1),
             "risk_level": latest_prediction.risk_level,
             "top_factors": latest_prediction.top_factors,
-            "predicted_at": latest_prediction.predicted_at.strftime("%Y-%m-%d %H:%M"),
+            "predicted_at": format_datetime_ist(latest_prediction.predicted_at),
         },
         "latest_psychometric": None
         if not latest_attempt
         else {
             "top_codes": latest_attempt.top_codes,
             "summary": latest_attempt.summary,
-            "submitted_at": latest_attempt.submitted_at.strftime("%Y-%m-%d %H:%M"),
+            "submitted_at": format_datetime_ist(latest_attempt.submitted_at),
         },
         "recommendation_count": recommendation_count,
+        "guidance_history_count": session.scalar(
+            select(func.count())
+            .select_from(CareerGuidanceSnapshot)
+            .where(CareerGuidanceSnapshot.student_id == student_id)
+        )
+        or 0,
     }
 
 

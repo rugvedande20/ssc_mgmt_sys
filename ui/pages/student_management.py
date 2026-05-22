@@ -3,10 +3,12 @@ import streamlit as st
 from config.constants import TARGET_GRADE_MAX, TARGET_GRADE_MIN
 from config.school_context import FUTURE_SCOPE_NOTE, GRADE_LABELS, PROFILE_FIELD_LABELS
 from src.db.database import get_db_session
+from src.services.career_recommendation_service import get_student_career_payload
 from src.services.student_service import create_student_user, get_student_overview, list_students
-from src.utils.helpers import profile_completeness_percent
+from src.utils.helpers import profile_completeness_percent, parse_json_list
 from ui.components.layout import section
 from ui.components.risk_display import risk_level_badge
+from ui.components.page_chrome import render_career_card, render_highlight_panel, render_page_header
 from ui.components.student_overview import (
     render_academic_tab,
     render_profile_tab,
@@ -16,16 +18,75 @@ from ui.components.student_overview import (
 from ui.components.tables import show_dataframe
 
 
-def _render_student_overview(overview: dict) -> None:
+def _render_career_guidance_tab(student_id: int, overview: dict) -> None:
+    with get_db_session() as session:
+        payload = get_student_career_payload(session, student_id)
+
+    snapshot = payload.get("snapshot")
+    if not snapshot:
+        st.info(
+            f"The student hasn't generated their career guidance report yet. "
+            f"Please follow up on **{overview['full_name']}**."
+        )
+        return
+
+    render_highlight_panel(
+        "Latest guidance",
+        snapshot["summary"],
+        variant="violet",
+        icon="◆",
+    )
+    st.caption(f"Generated {snapshot['generated_at']} · Phase: **{snapshot['phase']}**")
+
+    report = snapshot.get("report") or {}
+    if snapshot["phase"] == "class_10_report" and report.get("class_10"):
+        c10 = report["class_10"]
+        st.subheader(c10.get("title", "Class 10 report"))
+        st.write(c10.get("summary", ""))
+        if c10.get("stream_recommendations"):
+            st.markdown("**Stream suggestions after 10th**")
+            for item in c10["stream_recommendations"]:
+                st.markdown(f"- **{item['stream']}** — {item['reason']}")
+        if c10.get("next_steps"):
+            st.markdown("**Next steps**")
+            for step in c10["next_steps"]:
+                st.markdown(f"- {step}")
+
+    if report.get("meta", {}).get("rising_sectors"):
+        st.markdown("**Rising sectors (5-year outlook)**")
+        for sector in report["meta"]["rising_sectors"]:
+            pct = round(float(sector.get("growth_rate", 0)) * 100)
+            st.caption(f"{sector['name']} — projected demand ~{pct}%")
+
+    recommendations = payload.get("recommendations") or []
+    if recommendations:
+        st.markdown("**Top career matches**")
+        for rec in recommendations:
+            render_career_card(
+                career_name=rec["career_name"],
+                match_score=rec["match_score"],
+                rationale=rec["rationale"],
+                skills=parse_json_list(rec["skill_gap"]),
+                activities=parse_json_list(rec["certifications"]),
+            )
+
+    history = payload.get("history") or []
+    if history:
+        with st.expander("Guidance history (year-on-year)"):
+            show_dataframe(history)
+
+
+def _render_student_overview(overview: dict, current_user: dict) -> None:
     st.markdown(f"### {overview['full_name']}")
     st.caption(f"@{overview['username']} · {overview['email']}")
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     profile = overview["profile"]
     completeness = profile_completeness_percent(profile)
     col1.metric("Profile", f"{completeness}%")
     col2.metric("Career records", overview["recommendation_count"])
-    with col3:
+    col3.metric("Guidance runs", overview.get("guidance_history_count", 0))
+    with col4:
         st.markdown("**Latest risk**")
         prediction = overview.get("latest_prediction")
         if prediction:
@@ -36,8 +97,8 @@ def _render_student_overview(overview: dict) -> None:
         else:
             st.write("—")
 
-    tab_profile, tab_academic, tab_risk, tab_psych = st.tabs(
-        ["Profile", "Academics", "Dropout risk", "Psychometric"]
+    tab_profile, tab_academic, tab_risk, tab_psych, tab_career = st.tabs(
+        ["Profile", "Academics", "Dropout risk", "Psychometric", "Career guidance"]
     )
 
     with tab_profile:
@@ -48,11 +109,17 @@ def _render_student_overview(overview: dict) -> None:
         render_risk_tab(overview.get("latest_prediction"))
     with tab_psych:
         render_psychometric_tab(overview.get("latest_psychometric"))
+    with tab_career:
+        _render_career_guidance_tab(overview["id"], overview)
 
 
 def render(current_user: dict) -> None:
-    st.header("Student Management")
-    st.caption(f"Create and review student accounts for Class {TARGET_GRADE_MIN}–{TARGET_GRADE_MAX}. {FUTURE_SCOPE_NOTE}")
+    render_page_header(
+        "Student Management",
+        f"Create and review student accounts for Class {TARGET_GRADE_MIN}–{TARGET_GRADE_MAX}. {FUTURE_SCOPE_NOTE}",
+        badge_text="Admin",
+        badge_variant="indigo",
+    )
 
     grade_options = list(range(TARGET_GRADE_MIN, TARGET_GRADE_MAX + 1))
     grade_labels = [GRADE_LABELS[g] for g in grade_options]
@@ -93,7 +160,10 @@ def render(current_user: dict) -> None:
                     st.error(str(exc))
 
     with section("Student directory", "Search and pick a student for the overview below."):
-        search_term = st.text_input("Search by name, username, or email")
+        search_term = st.text_input(
+            "Search by name, username, or email",
+            placeholder="Search by name, username, or email…",
+        )
         with get_db_session() as session:
             students = list_students(
                 session, search_term=search_term, limit=100, admin_user_id=current_user["id"]
@@ -105,11 +175,11 @@ def render(current_user: dict) -> None:
             st.info("No students found for the current search.")
             return
 
-    with section("Student overview", "Profile, academics, risk, and psychometric data for one student."):
+    with section("Student overview", "Profile, academics, risk, psychometric, and career guidance."):
         student_labels = {f"{student['full_name']} ({student['username']})": student["id"] for student in students}
         selected_label = st.selectbox("Select a student", list(student_labels.keys()))
         with get_db_session() as session:
             overview = get_student_overview(session, student_labels[selected_label])
 
         if overview:
-            _render_student_overview(overview)
+            _render_student_overview(overview, current_user)

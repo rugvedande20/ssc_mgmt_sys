@@ -1,9 +1,15 @@
 import streamlit as st
 
+from ui.components.page_chrome import render_page_header
 
-def render() -> None:
-    st.header("Interventions")
-    st.caption("Log counseling notes and track actions taken for at-risk students.")
+
+def render(current_user: dict | None = None) -> None:
+    render_page_header(
+        "Interventions",
+        "Log counseling notes and track actions taken for at-risk students.",
+        badge_text="Admin",
+        badge_variant="indigo",
+    )
 
     st.info(
         "Intervention logging is planned for a later milestone. "

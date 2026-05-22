@@ -5,10 +5,9 @@ from src.db.database import get_db_session
 from src.db.models import User
 from src.services.dropout_service import list_latest_predictions_per_student
 from src.services.user_service import get_dashboard_counts
-from ui.components.charts import risk_distribution_chart
-from ui.components.layout import section, show_plotly_chart
+from ui.components.layout import section
 from ui.components.page_chrome import render_page_header
-from ui.components.risk_display import render_risk_explanations_section
+from ui.components.risk_display import _count_by_level, exclude_removed_students
 from ui.components.tables import show_dataframe
 
 
@@ -66,12 +65,18 @@ def render(current_user: dict) -> None:
                 st.info("No students yet. Create accounts under Student Management.")
 
     if predictions:
-        st.divider()
-        render_risk_explanations_section(predictions, section_key="admin_risk_expl")
-
-    chart = risk_distribution_chart(predictions if predictions else [])
-    with section("Risk distribution", "Count of students in each risk band."):
-        if chart:
-            show_plotly_chart(chart, key="admin_dashboard_risk_chart")
-        else:
-            st.info("Chart appears after predictions are available.")
+        filtered = exclude_removed_students(predictions)
+        counts = _count_by_level(filtered)
+        with section(
+            "Dropout risk summary",
+            "High-level counts. Open Dropout Analysis for full risk explanations per student.",
+        ):
+            r1, r2, r3, r4 = st.columns(4)
+            r1.metric("High risk", counts.get("High", 0))
+            r2.metric("Medium risk", counts.get("Medium", 0))
+            r3.metric("Low risk", counts.get("Low", 0))
+            r4.metric("Students scored", len(filtered))
+            if st.button("View details", type="primary", use_container_width=True, key="dash_risk_details"):
+                st.session_state["nav_page"] = "Dropout Analysis"
+                st.session_state["focus_risk_explanations"] = True
+                st.rerun()

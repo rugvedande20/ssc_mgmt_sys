@@ -4,6 +4,7 @@ from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Te
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db.database import Base
+from src.utils.datetime_ist import now_ist
 
 
 class User(Base):
@@ -16,7 +17,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_ist, nullable=False)
     created_by_admin_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
 
     student_profile: Mapped["StudentProfile"] = relationship(back_populates="user", uselist=False)
@@ -24,6 +25,7 @@ class User(Base):
     dropout_predictions: Mapped[list["DropoutPrediction"]] = relationship(back_populates="student")
     psychometric_attempts: Mapped[list["PsychometricAttempt"]] = relationship(back_populates="student")
     career_recommendations: Mapped[list["CareerRecommendation"]] = relationship(back_populates="student")
+    career_guidance_snapshots: Mapped[list["CareerGuidanceSnapshot"]] = relationship(back_populates="student")
     intervention_logs: Mapped[list["InterventionLog"]] = relationship(
         back_populates="student",
         foreign_keys="InterventionLog.student_id",
@@ -49,7 +51,7 @@ class StudentProfile(Base):
     interests_summary: Mapped[str | None] = mapped_column(Text)
     strengths_summary: Mapped[str | None] = mapped_column(Text)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        DateTime, default=now_ist, onupdate=now_ist, nullable=False
     )
 
     user: Mapped[User] = relationship(back_populates="student_profile")
@@ -70,7 +72,7 @@ class AcademicRecord(Base):
     disciplinary_issues: Mapped[int | None] = mapped_column(Integer)
     engagement_score: Mapped[float | None] = mapped_column(Float)
     stress_level: Mapped[float | None] = mapped_column(Float)
-    recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, default=now_ist, nullable=False)
 
     student: Mapped[User] = relationship(back_populates="academic_records")
 
@@ -83,7 +85,7 @@ class DropoutPrediction(Base):
     risk_score: Mapped[float] = mapped_column(Float, nullable=False)
     risk_level: Mapped[str] = mapped_column(String(20), nullable=False)
     top_factors: Mapped[str] = mapped_column(Text, nullable=False)
-    predicted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    predicted_at: Mapped[datetime] = mapped_column(DateTime, default=now_ist, nullable=False)
 
     student: Mapped[User] = relationship(back_populates="dropout_predictions")
 
@@ -93,7 +95,7 @@ class PsychometricAttempt(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    submitted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime, default=now_ist, nullable=False)
     riasec_scores: Mapped[str] = mapped_column(Text, nullable=False)
     top_codes: Mapped[str] = mapped_column(String(50), nullable=False)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
@@ -101,20 +103,42 @@ class PsychometricAttempt(Base):
     student: Mapped[User] = relationship(back_populates="psychometric_attempts")
 
 
+class CareerGuidanceSnapshot(Base):
+    __tablename__ = "career_guidance_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    student_class: Mapped[int | None] = mapped_column(Integer)
+    phase: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    report_json: Mapped[str] = mapped_column(Text, nullable=False)
+    labour_horizon_years: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
+    generated_at: Mapped[datetime] = mapped_column(DateTime, default=now_ist, nullable=False)
+
+    student: Mapped[User] = relationship(back_populates="career_guidance_snapshots")
+    recommendations: Mapped[list["CareerRecommendation"]] = relationship(back_populates="guidance_snapshot")
+
+
 class CareerRecommendation(Base):
     __tablename__ = "career_recommendations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    guidance_snapshot_id: Mapped[int | None] = mapped_column(
+        ForeignKey("career_guidance_snapshots.id"), nullable=True, index=True
+    )
     career_name: Mapped[str] = mapped_column(String(120), nullable=False)
     match_score: Mapped[float] = mapped_column(Float, nullable=False)
     rationale: Mapped[str] = mapped_column(Text, nullable=False)
     skill_gap: Mapped[str] = mapped_column(Text, nullable=False)
     roadmap: Mapped[str] = mapped_column(Text, nullable=False)
     certifications: Mapped[str] = mapped_column(Text, nullable=False)
-    generated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    generated_at: Mapped[datetime] = mapped_column(DateTime, default=now_ist, nullable=False)
 
     student: Mapped[User] = relationship(back_populates="career_recommendations")
+    guidance_snapshot: Mapped["CareerGuidanceSnapshot | None"] = relationship(
+        back_populates="recommendations"
+    )
 
 
 class InterventionLog(Base):
@@ -125,6 +149,6 @@ class InterventionLog(Base):
     admin_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     note: Mapped[str] = mapped_column(Text, nullable=False)
     action_taken: Mapped[str] = mapped_column(String(120), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_ist, nullable=False)
 
     student: Mapped[User] = relationship(foreign_keys=[student_id], back_populates="intervention_logs")

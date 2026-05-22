@@ -1,0 +1,63 @@
+{
+  "horizon_years": 5,
+  "updated": "2026-05",
+  "note": "Illustrative India-focused labour projection for school career guidance (not official government data).",
+  "sectors": [
+    {
+      "id": "digital_tech",
+      "name": "Digital technology & AI",
+      "growth_rate": 0.92,
+      "rising_roles": ["AI/ML engineer", "cybersecurity analyst", "cloud developer", "data analyst"],
+      "skills_in_demand": ["Python", "data literacy", "problem solving", "logical thinking"]
+    },
+    {
+      "id": "healthcare",
+      "name": "Healthcare & life sciences",
+      "growth_rate": 0.78,
+      "rising_roles": ["nurse", "medical technologist", "public health worker", "biotech technician"],
+      "skills_in_demand": ["biology", "empathy", "attention to detail", "science fundamentals"]
+    },
+    {
+      "id": "green_energy",
+      "name": "Green energy & sustainability",
+      "growth_rate": 0.85,
+      "rising_roles": ["solar technician", "EV maintenance specialist", "environmental analyst"],
+      "skills_in_demand": ["physics basics", "environmental awareness", "hands-on skills"]
+    },
+    {
+      "id": "education_services",
+      "name": "Education & learning services",
+      "growth_rate": 0.65,
+      "rising_roles": ["teacher", "instructional designer", "ed-tech facilitator", "counsellor"],
+      "skills_in_demand": ["communication", "patience", "subject mastery", "mentoring"]
+    },
+    {
+      "id": "creative_media",
+      "name": "Creative & digital media",
+      "growth_rate": 0.72,
+      "rising_roles": ["UX designer", "content creator", "animator", "game designer"],
+      "skills_in_demand": ["creativity", "visual design", "storytelling", "digital tools"]
+    },
+    {
+      "id": "business_finance",
+      "name": "Business, finance & entrepreneurship",
+      "growth_rate": 0.68,
+      "rising_roles": ["financial analyst", "chartered accountant", "startup founder", "operations manager"],
+      "skills_in_demand": ["numeracy", "communication", "planning", "economics basics"]
+    },
+    {
+      "id": "infrastructure",
+      "name": "Infrastructure & manufacturing",
+      "growth_rate": 0.58,
+      "rising_roles": ["civil engineer", "mechatronics technician", "quality inspector"],
+      "skills_in_demand": ["mathematics", "spatial reasoning", "safety awareness"]
+    },
+    {
+      "id": "social_wellbeing",
+      "name": "Social work & community wellbeing",
+      "growth_rate": 0.62,
+      "rising_roles": ["psychologist", "social worker", "NGO programme officer"],
+      "skills_in_demand": ["empathy", "listening", "ethics", "teamwork"]
+    }
+  ]
+}

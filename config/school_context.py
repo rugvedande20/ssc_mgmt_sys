@@ -15,12 +15,42 @@ GRADE_LABELS = {grade: f"Class {grade}" for grade in SCHOOL_GRADES}
 SCHOOL_BOARDS = ("", "CBSE", "ICSE", "State Board", "IB", "Other")
 
 # DB column name -> admin/student-facing label
+# Annual household income (stored as display label in DB)
+FAMILY_INCOME_BRACKETS: tuple[str, ...] = (
+    "",
+    "Below ₹2 lakh per year",
+    "₹2–5 lakh per year",
+    "₹5–10 lakh per year",
+    "₹10–20 lakh per year",
+    "Above ₹20 lakh per year",
+)
+
+# Map stored bracket → dropout model training categories (Low / Middle / …)
+INCOME_BRACKET_TO_MODEL_BAND: dict[str, str] = {
+    "Below ₹2 lakh per year": "Low",
+    "₹2–5 lakh per year": "Middle",
+    "₹5–10 lakh per year": "Middle",
+    "₹10–20 lakh per year": "Upper Middle",
+    "Above ₹20 lakh per year": "High",
+    "Low": "Low",
+    "Middle": "Middle",
+    "Upper Middle": "Upper Middle",
+    "High": "High",
+}
+
+
+def income_band_for_dropout_model(stored_value: str | None) -> str:
+    if not stored_value:
+        return "Middle"
+    return INCOME_BRACKET_TO_MODEL_BAND.get(stored_value.strip(), "Middle")
+
+
 PROFILE_FIELD_LABELS = {
     "age": "Age",
     "gender": "Gender",
     "department": "School name",
     "semester": "Class",
-    "family_income_band": "Family income band",
+    "family_income_band": "Family annual income",
     "parental_education": "Parent / guardian education",
     "travel_distance_km": "Distance from school (km)",
     "internet_access": "Internet access at home",
@@ -148,6 +178,38 @@ ACADEMIC_DB_COLUMNS = ACADEMIC_RECORD_DB_COLUMNS
 
 # DB column -> preferred school CSV header (for error messages)
 DB_TO_SCHOOL_CSV_HEADER = {v: k for k, v in ACADEMIC_CSV_ALIASES.items() if k in SCHOOL_ACADEMIC_CSV_COLUMNS}
+
+
+# Per-student academic upload (no username column — tied to selected student)
+SCHOOL_STUDENT_ACADEMIC_COLUMNS = [
+    "attendance_pct",
+    "overall_marks_pct",
+    "latest_term_test_pct",
+    "subjects_below_passing",
+    "school_fee_pending",
+    "scholarship_or_concession",
+    "extracurricular_activities",
+    "disciplinary_incidents",
+    "class_participation_score",
+    "stress_level",
+]
+
+
+def build_student_academic_template_rows() -> list[dict[str, object]]:
+    return [
+        {
+            "attendance_pct": 88.0,
+            "overall_marks_pct": 74.0,
+            "latest_term_test_pct": 72.0,
+            "subjects_below_passing": 0,
+            "school_fee_pending": "No",
+            "scholarship_or_concession": "No",
+            "extracurricular_activities": "Yes",
+            "disciplinary_incidents": 0,
+            "class_participation_score": 7.8,
+            "stress_level": 4.0,
+        }
+    ]
 
 
 def build_academic_csv_template_rows() -> list[dict[str, object]]:

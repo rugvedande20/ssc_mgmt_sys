@@ -1,9 +1,15 @@
+import os
+
+os.environ.setdefault("TZ", "Asia/Kolkata")
+
 import streamlit as st
 
 from config.settings import settings
 from src.auth.guards import get_current_user, init_session_state, logout_user
 from src.db.database import Base, apply_schema_patches, get_database_mode, get_engine, get_db_session
+from src.db import models as _db_models  # noqa: F401 — register ORM tables
 from src.db.seed import remove_legacy_demo_student, seed_demo_data
+from ui.components.sidebar_nav import render_sidebar_nav
 from ui.components.theme import inject_app_theme, render_app_hero
 
 
@@ -60,23 +66,6 @@ def page_options_for(user: dict) -> list[str]:
     return _student_page_options(user["id"])
 
 
-def render_sidebar_nav(user: dict) -> str:
-    options = page_options_for(user)
-    if "nav_page" not in st.session_state or st.session_state["nav_page"] not in options:
-        st.session_state["nav_page"] = options[0]
-
-    st.sidebar.markdown('<p class="nav-heading">Menu</p>', unsafe_allow_html=True)
-    selected = st.sidebar.radio(
-        "Navigation",
-        options,
-        index=options.index(st.session_state["nav_page"]),
-        label_visibility="collapsed",
-        key="sidebar_nav_radio",
-    )
-    st.session_state["nav_page"] = selected
-    return selected
-
-
 def render_sidebar(user: dict | None) -> str | None:
     if not user:
         return None
@@ -94,7 +83,7 @@ def render_sidebar(user: dict | None) -> str | None:
     if get_database_mode() == "memory":
         st.sidebar.warning("In-memory DB — data resets on restart.")
 
-    page_name = render_sidebar_nav(user)
+    page_name = render_sidebar_nav(page_options_for(user))
 
     st.sidebar.divider()
     if st.sidebar.button("Logout", use_container_width=True, key="sidebar_logout"):
@@ -158,7 +147,6 @@ def main() -> None:
     from config.school_context import APP_TAGLINE
 
     if not current_user:
-        render_app_hero(settings.app_name, APP_TAGLINE)
         render_page("Login", None)
         return
 
