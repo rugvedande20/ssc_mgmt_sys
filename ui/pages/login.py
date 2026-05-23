@@ -68,7 +68,7 @@ def render() -> None:
         st.markdown('<div class="login-page">', unsafe_allow_html=True)
         st.markdown(
             f"""
-            <div class="login-project-title">{settings.app_name}</div>
+            <div class="login-project-title">{settings.login_app_name}</div>
             <p class="login-project-tagline">School success &amp; career guidance · Class 6–10</p>
             """,
             unsafe_allow_html=True,

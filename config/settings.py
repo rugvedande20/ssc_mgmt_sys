@@ -6,6 +6,7 @@ from sqlalchemy import URL
 
 class AppSettings(BaseModel):
     app_name: str = "Student Success and Career Navigation Management System"
+    login_app_name: str = "SSC Management System"
     app_version: str = "0.1.0"
     base_dir: Path = Path(__file__).resolve().parent.parent
     data_dir: Path = base_dir / "data"
