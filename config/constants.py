@@ -1,7 +1,10 @@
 ROLES = {
     "student": "student",
     "admin": "admin",
+    "superadmin": "superadmin",
 }
+
+STAFF_ROLES = ("admin", "superadmin")
 
 RISK_LEVELS = ("Low", "Medium", "High")
 

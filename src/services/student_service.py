@@ -132,10 +132,13 @@ def list_students(
     search_term: str = "",
     limit: int = 100,
     admin_user_id: int | None = None,
+    assigned_grade: int | None = None,
 ) -> list[dict[str, Any]]:
     filters = [User.role == "student"]
     if admin_user_id is not None:
         filters.append(User.created_by_admin_id == admin_user_id)
+    if assigned_grade is not None:
+        filters.append(StudentProfile.semester == int(assigned_grade))
 
     query = (
         select(
@@ -191,10 +194,23 @@ def list_students(
     ]
 
 
-def list_student_options(session, admin_user_id: int | None = None) -> list[tuple[int, str]]:
+def list_student_options(
+    session,
+    admin_user_id: int | None = None,
+    assigned_grade: int | None = None,
+) -> list[tuple[int, str]]:
     filters = [User.role == "student"]
     if admin_user_id is not None:
         filters.append(User.created_by_admin_id == admin_user_id)
+    if assigned_grade is not None:
+        query = (
+            select(User.id, User.full_name)
+            .join(StudentProfile, StudentProfile.user_id == User.id)
+            .where(*filters, StudentProfile.semester == int(assigned_grade))
+            .order_by(User.full_name.asc())
+        )
+        rows = session.execute(query).all()
+        return [(row.id, row.full_name) for row in rows]
     rows = session.execute(
         select(User.id, User.full_name).where(*filters).order_by(User.full_name.asc())
     ).all()
@@ -220,8 +236,10 @@ def add_academic_record(session, student_id: int, record_data: dict[str, Any]) -
     return record
 
 
-def list_recent_academic_records(session, limit: int = 50) -> list[dict[str, Any]]:
-    rows = session.execute(
+def list_recent_academic_records(
+    session, limit: int = 50, admin_user_id: int | None = None
+) -> list[dict[str, Any]]:
+    stmt = (
         select(
             User.full_name,
             AcademicRecord.attendance_percentage,
@@ -230,9 +248,11 @@ def list_recent_academic_records(session, limit: int = 50) -> list[dict[str, Any
             AcademicRecord.recorded_at,
         )
         .join(AcademicRecord, AcademicRecord.student_id == User.id)
-        .order_by(desc(AcademicRecord.recorded_at))
-        .limit(limit)
-    ).all()
+        .where(User.role == "student")
+    )
+    if admin_user_id is not None:
+        stmt = stmt.where(User.created_by_admin_id == admin_user_id)
+    rows = session.execute(stmt.order_by(desc(AcademicRecord.recorded_at)).limit(limit)).all()
     return [
         {
             "student_name": row.full_name,
@@ -301,13 +321,37 @@ def list_students_with_latest_records(session) -> list[dict[str, Any]]:
     ]
 
 
-def academic_record_summary(session) -> dict[str, int]:
-    return {
-        "students_with_records": session.scalar(
-            select(func.count(func.distinct(AcademicRecord.student_id))).select_from(AcademicRecord)
+def academic_record_summary(session, admin_user_id: int | None = None) -> dict[str, int]:
+    if admin_user_id is None:
+        return {
+            "students_with_records": session.scalar(
+                select(func.count(func.distinct(AcademicRecord.student_id))).select_from(AcademicRecord)
+            )
+            or 0,
+            "total_records": session.scalar(select(func.count()).select_from(AcademicRecord)) or 0,
+        }
+
+    students_with_records = (
+        session.scalar(
+            select(func.count(func.distinct(AcademicRecord.student_id)))
+            .select_from(AcademicRecord)
+            .join(User, User.id == AcademicRecord.student_id)
+            .where(User.created_by_admin_id == admin_user_id)
         )
-        or 0,
-        "total_records": session.scalar(select(func.count()).select_from(AcademicRecord)) or 0,
+        or 0
+    )
+    total_records = (
+        session.scalar(
+            select(func.count())
+            .select_from(AcademicRecord)
+            .join(User, User.id == AcademicRecord.student_id)
+            .where(User.created_by_admin_id == admin_user_id)
+        )
+        or 0
+    )
+    return {
+        "students_with_records": students_with_records,
+        "total_records": total_records,
     }
 
 

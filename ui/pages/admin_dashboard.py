@@ -5,6 +5,12 @@ from src.db.database import get_db_session
 from src.db.models import User
 from src.services.dropout_service import list_latest_predictions_per_student
 from src.services.user_service import get_dashboard_counts
+from src.utils.admin_context import (
+    admin_page_subtitle,
+    assigned_grade_for_user,
+    grade_scope_label,
+    student_owner_id,
+)
 from ui.components.layout import section
 from ui.components.page_chrome import render_page_header
 from ui.components.risk_display import _count_by_level, exclude_removed_students
@@ -12,19 +18,40 @@ from ui.components.tables import show_dataframe
 
 
 def render(current_user: dict) -> None:
+    grade_label = grade_scope_label(current_user)
+    title = f"Class {assigned_grade_for_user(current_user)} Dashboard" if grade_label else "Dashboard"
     render_page_header(
-        "Dashboard",
-        f"Welcome back, {current_user['full_name']}.",
+        title,
+        admin_page_subtitle(f"Welcome back, {current_user['full_name']}.", current_user),
         badge_text="Admin",
         badge_variant="indigo",
     )
 
+    grade_scope = assigned_grade_for_user(current_user)
+    owner_id = student_owner_id(current_user)
     with get_db_session() as session:
-        counts = get_dashboard_counts(session)
-        students = session.execute(
-            select(User.full_name, User.email).where(User.role == "student").order_by(User.full_name.asc())
-        ).all()
-        predictions = list_latest_predictions_per_student(session, limit=100)
+        counts = get_dashboard_counts(
+            session, assigned_grade=grade_scope, admin_user_id=owner_id
+        )
+        student_filters = [User.role == "student"]
+        if owner_id is not None:
+            student_filters.append(User.created_by_admin_id == owner_id)
+        student_query = select(User.full_name, User.email).where(*student_filters)
+        if grade_scope is not None:
+            from src.db.models import StudentProfile
+
+            student_query = (
+                select(User.full_name, User.email)
+                .join(StudentProfile, StudentProfile.user_id == User.id)
+                .where(*student_filters, StudentProfile.semester == grade_scope)
+            )
+        students = session.execute(student_query.order_by(User.full_name.asc())).all()
+        predictions = list_latest_predictions_per_student(
+            session,
+            limit=100,
+            assigned_grade=grade_scope,
+            admin_user_id=owner_id,
+        )
 
     metric_cols = st.columns(4)
     metric_cols[0].metric("Students", counts["total_students"])

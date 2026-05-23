@@ -9,6 +9,12 @@ from src.services.dropout_service import (
 )
 from ui.components.charts import risk_distribution_chart
 from ui.components.layout import section, show_plotly_chart
+from src.utils.admin_context import (
+    admin_page_subtitle,
+    assigned_grade_for_user,
+    grade_scope_label,
+    student_owner_id,
+)
 from ui.components.page_chrome import render_page_header
 from ui.components.model_evaluation import render_model_metrics_table
 from ui.components.risk_display import render_risk_explanations_section, scroll_to_risk_explanations
@@ -18,12 +24,19 @@ from ui.components.tables import show_dataframe
 def render(current_user: dict | None = None) -> None:
     focus_risk = st.session_state.pop("focus_risk_explanations", False)
 
+    grade_label = grade_scope_label(current_user)
+    title = f"Class {assigned_grade_for_user(current_user)} Dropout Analysis" if grade_label else "Dropout Analysis"
     render_page_header(
-        "Dropout Analysis",
-        "Train the model once, then score the latest record for each Class 6–10 student.",
+        title,
+        admin_page_subtitle(
+            "Train the model once, then score the latest record for each Class 6–10 student.",
+            current_user,
+        ),
         badge_text="Admin",
         badge_variant="indigo",
     )
+    grade_scope = assigned_grade_for_user(current_user)
+    owner_id = student_owner_id(current_user)
 
     model_status = get_dropout_model_status()
 
@@ -61,7 +74,12 @@ def render(current_user: dict | None = None) -> None:
                 st.rerun()
 
     with get_db_session() as session:
-        latest_predictions = list_latest_predictions_per_student(session, limit=100)
+        latest_predictions = list_latest_predictions_per_student(
+            session,
+            limit=100,
+            assigned_grade=grade_scope,
+            admin_user_id=owner_id,
+        )
 
     if not latest_predictions:
         st.info("No predictions yet. Train the model and run predictions.")

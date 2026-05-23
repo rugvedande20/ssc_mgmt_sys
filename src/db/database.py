@@ -77,6 +77,10 @@ def apply_schema_patches(engine) -> None:
             FOREIGN KEY(student_id) REFERENCES users(id)
         )""",
         "ALTER TABLE career_recommendations ADD COLUMN guidance_snapshot_id INTEGER REFERENCES career_guidance_snapshots(id)",
+        "ALTER TABLE users ADD COLUMN first_name VARCHAR(60)",
+        "ALTER TABLE users ADD COLUMN last_name VARCHAR(60)",
+        "ALTER TABLE users ADD COLUMN contact_phone VARCHAR(30)",
+        "ALTER TABLE users ADD COLUMN assigned_grade INTEGER",
     ]
     with engine.connect() as connection:
         with connection.begin():

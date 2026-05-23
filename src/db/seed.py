@@ -36,16 +36,33 @@ def remove_legacy_demo_student(session) -> None:
 def seed_demo_data(session) -> None:
     remove_legacy_demo_student(session)
 
-    existing_admin = session.scalar(select(User).where(User.username == "admin"))
-    if existing_admin:
-        return
+    existing_superadmin = session.scalar(select(User).where(User.username == "superadmin"))
+    if not existing_superadmin:
+        session.add(
+            User(
+                username="superadmin",
+                full_name="Super Admin",
+                first_name="Super",
+                last_name="Admin",
+                email="superadmin@ssc.local",
+                password_hash=hash_password("superadmin@123"),
+                role="superadmin",
+                is_active=True,
+            )
+        )
 
-    admin = User(
-        username="admin",
-        full_name="Ananya Sharma",
-        email="admin@demo.edu",
-        password_hash=hash_password("Admin@123"),
-        role="admin",
-        is_active=True,
-    )
-    session.add(admin)
+    existing_admin = session.scalar(select(User).where(User.username == "admin"))
+    if not existing_admin:
+        session.add(
+            User(
+                username="admin",
+                full_name="Ananya Sharma",
+                first_name="Ananya",
+                last_name="Sharma",
+                email="admin@demo.edu",
+                password_hash=hash_password("Admin@123"),
+                role="admin",
+                assigned_grade=6,
+                is_active=True,
+            )
+        )

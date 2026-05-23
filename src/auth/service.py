@@ -4,6 +4,16 @@ from src.auth.hashing import verify_password
 from src.db.models import User
 
 
+def is_superadmin_username(session, username: str) -> bool:
+    username = username.strip()
+    if not username:
+        return False
+    role = session.scalar(
+        select(User.role).where(User.username == username, User.is_active.is_(True))
+    )
+    return role == "superadmin"
+
+
 def authenticate_user(session, username: str, password: str) -> User | None:
     user = session.scalar(select(User).where(User.username == username, User.is_active.is_(True)))
     if not user:

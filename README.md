@@ -1,64 +1,72 @@
-# Class 6–10 Student Success & Career Guidance
+# SSC Management System
 
-A Streamlit app for **Indian school students in Class 6–10** (upper primary / secondary). Class 11–12 stream and board-exam guidance is planned for a future release.
+A Streamlit app for **Indian school students in Class 6–10** (upper primary / secondary). Teachers and admins manage students, academic data, and dropout-risk insights; students complete profiles, interest assessments, and early career guidance.
 
 ## Features
 
-- **Teachers / admins:** manage students, upload term marks & attendance, run dropout-risk predictions
-- **Students:** school profile, interest assessment (RIASEC-style), early career ideas and roadmaps
+- **Super Admin:** staff account management (create/edit/deactivate admins and superadmins)
+- **Class-scoped admins:** dashboards and student tools default to their assigned class (6–10)
+- **Students:** school profile, interest assessment (RIASEC-style), career ideas and roadmaps
+- **Dropout risk:** train and run predictions on uploaded term marks and attendance
+- **Academic data:** CSV bulk upload and per-student manual entry
 
-## Implemented
+## Roles
 
-- Authentication (admin + student)
-- School profiles (class, school name, interests)
-- Academic records (percentages, attendance, participation)
-- Dropout risk model (baseline; retrain after updates)
-- Interest assessment (section-by-section)
-- Dashboards and demo career ideas
-
-## In progress
-
-- Personalized career recommendation engine
-- Intervention logging
+| Role | Access |
+|------|--------|
+| **Super Admin** | Sign-in choice: **Admin UI** (same as class admin) or **User Management** (staff accounts) |
+| **Admin** | Dashboard, students, uploads, dropout analysis — scoped to assigned class |
+| **Student** | Profile, assessment, career ideas |
 
 ## Run locally
 
 ```bash
 pip install -r requirements.txt
-streamlit run streamlit_app.py
+streamlit run app.py
 ```
 
-Use the project virtual environment if you have one:
+With a virtual environment:
 
 ```bash
 .\.venv\Scripts\activate
 pip install -r requirements.txt
-streamlit run streamlit_app.py
+streamlit run app.py
 ```
 
 ## Demo credentials
 
-- Admin: `admin` / `Admin@123`
-- Students: created by the admin under **Student Management** (no default demo student account)
+| Account | Username | Password | Notes |
+|---------|----------|----------|--------|
+| Super Admin | `superadmin` | `superadmin@123` | Choose **Admin UI** or **User Management** at sign-in |
+| Class admin (demo) | `admin` | `Admin@123` | Defaults to **Class 6** |
+| New staff | *(auto-generated)* | `anasha@123` | Created in User Management; username like `anasha_admin6` for Ananya Sharma, Class 6 |
+
+Students are created by admins under **Student Management** (no default student login).
+
+### Staff username format
+
+- **Admin:** first 3 letters of first name + first 3 of last name + `_admin` + class number — e.g. `anasha_admin6`
+- **Super Admin:** same prefix + `_superadmin` — e.g. `anasha_superadmin`
+- **Password:** first 3 letters of first name + first 3 of last name + `@123` — e.g. `anasha@123`
 
 ## Demo flow
 
-1. Admin → create students (Class 6–10) → download CSV template → upload term marks & attendance
-2. Dropout Analysis → train model → run predictions
-3. Student → complete profile → interest assessment → career ideas page
+1. **Super Admin** → User Management → add admins for each class
+2. **Admin** → Student Management → create Class 6–10 students → download CSV template → upload marks
+3. **Dropout Analysis** → train model → run predictions
+4. **Student** → complete profile → interest assessment → career ideas
 
-**Note:** Restart the app after upgrading; legacy demo data for removed students is cleaned up automatically on startup.
+Restart the app after upgrades; legacy demo student data is removed on startup.
 
 ## Deploy on Streamlit Community Cloud
 
-1. Main file: `streamlit_app.py`
-2. Python version: `runtime.txt` must be in the repo root (`python-3.12`). Without it, Cloud may use Python 3.14 and fail to build `pandas` / `pyarrow`.
-3. Dependencies: only `requirements.txt` (do not pin `pyarrow` or other Streamlit-managed packages separately).
-4. After pushing, open **Manage app → Reboot app** if dependency errors persist.
+1. Main file: `app.py`
+2. Python version: `runtime.txt` in the repo root (`python-3.12`)
+3. Dependencies: `requirements.txt` only (do not pin `pyarrow` separately)
+4. After pushing, use **Manage app → Reboot app** if builds fail
 
 ## Deploy on Render
 
-1. **Python 3.12 is required.** Render ignores `runtime.txt`; use the repo root `.python-version` (`3.12.8`) or set environment variable `PYTHON_VERSION` to `3.12.8` in the Render dashboard.
-2. Build command: `pip install -r requirements.txt`
-3. Start command: `streamlit run streamlit_app.py --server.port=$PORT --server.address=0.0.0.0`
-4. If the build still picks Python 3.14, clear the build cache and redeploy after pushing `.python-version`.
+1. **Python 3.12** — use `.python-version` (`3.12.8`) or set `PYTHON_VERSION=3.12.8`
+2. Build: `pip install -r requirements.txt`
+3. Start: `streamlit run app.py --server.port=$PORT --server.address=0.0.0.0`

@@ -5,6 +5,13 @@ from config.school_context import FUTURE_SCOPE_NOTE, GRADE_LABELS, PROFILE_FIELD
 from src.db.database import get_db_session
 from src.services.career_recommendation_service import get_student_career_payload
 from src.services.student_service import create_student_user, get_student_overview, list_students
+from src.utils.admin_context import (
+    admin_page_subtitle,
+    assigned_grade_for_user,
+    grade_default_index,
+    grade_scope_label,
+    student_owner_id,
+)
 from src.utils.helpers import profile_completeness_percent, parse_json_list
 from ui.components.layout import section
 from ui.components.risk_display import risk_level_badge
@@ -114,15 +121,22 @@ def _render_student_overview(overview: dict, current_user: dict) -> None:
 
 
 def render(current_user: dict) -> None:
+    grade_label = grade_scope_label(current_user)
+    title = f"Class {assigned_grade_for_user(current_user)} Student Management" if grade_label else "Student Management"
     render_page_header(
-        "Student Management",
-        f"Create and review student accounts for Class {TARGET_GRADE_MIN}–{TARGET_GRADE_MAX}. {FUTURE_SCOPE_NOTE}",
+        title,
+        admin_page_subtitle(
+            f"Create and review student accounts for Class {TARGET_GRADE_MIN}–{TARGET_GRADE_MAX}. {FUTURE_SCOPE_NOTE}",
+            current_user,
+        ),
         badge_text="Admin",
         badge_variant="indigo",
     )
 
+    grade_scope = assigned_grade_for_user(current_user)
     grade_options = list(range(TARGET_GRADE_MIN, TARGET_GRADE_MAX + 1))
     grade_labels = [GRADE_LABELS[g] for g in grade_options]
+    default_class_index = grade_default_index(current_user, grade_options)
 
     with section("Create student", "New Class 6–10 login and profile."):
         with st.form("create_student_form", clear_on_submit=True):
@@ -135,7 +149,12 @@ def render(current_user: dict) -> None:
                 PROFILE_FIELD_LABELS["department"],
                 placeholder="e.g. City Public School (CBSE)",
             )
-            class_label = col2.selectbox(PROFILE_FIELD_LABELS["semester"], grade_labels, index=2)
+            class_label = col2.selectbox(
+                PROFILE_FIELD_LABELS["semester"],
+                grade_labels,
+                index=default_class_index,
+                disabled=grade_scope is not None,
+            )
             submitted = st.form_submit_button("Create student", use_container_width=True)
 
         if submitted:
@@ -143,7 +162,7 @@ def render(current_user: dict) -> None:
                 st.error("Full name, username, email, and password are required.")
             else:
                 try:
-                    selected_grade = grade_options[grade_labels.index(class_label)]
+                    selected_grade = grade_scope or grade_options[grade_labels.index(class_label)]
                     with get_db_session() as session:
                         create_student_user(
                             session,
@@ -166,7 +185,11 @@ def render(current_user: dict) -> None:
         )
         with get_db_session() as session:
             students = list_students(
-                session, search_term=search_term, limit=100, admin_user_id=current_user["id"]
+                session,
+                search_term=search_term,
+                limit=100,
+                admin_user_id=student_owner_id(current_user),
+                assigned_grade=grade_scope,
             )
 
         if students:

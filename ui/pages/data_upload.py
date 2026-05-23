@@ -18,6 +18,12 @@ from src.services.student_service import (
     list_recent_academic_records,
     list_student_options,
 )
+from src.utils.admin_context import (
+    admin_page_subtitle,
+    assigned_grade_for_user,
+    grade_scope_label,
+    student_owner_id,
+)
 from ui.components.layout import section
 from ui.components.page_chrome import render_page_header
 from ui.components.tables import show_dataframe
@@ -56,14 +62,24 @@ def _render_import_results(result: dict) -> None:
 
 
 def render(current_user: dict) -> None:
+    grade_label = grade_scope_label(current_user)
+    title = (
+        f"Class {assigned_grade_for_user(current_user)} Academic Data Upload"
+        if grade_label
+        else "Academic Data Upload"
+    )
     render_page_header(
-        "Academic Data Upload",
-        f"Bulk upload for all students — term-wise marks and attendance (Class {TARGET_GRADE_MIN}–{TARGET_GRADE_MAX}). {FUTURE_SCOPE_NOTE}",
+        title,
+        admin_page_subtitle(
+            f"Bulk upload for all students — term-wise marks and attendance (Class {TARGET_GRADE_MIN}–{TARGET_GRADE_MAX}). {FUTURE_SCOPE_NOTE}",
+            current_user,
+        ),
         badge_text="Admin",
         badge_variant="indigo",
     )
 
-    admin_id = current_user["id"] if current_user.get("role") == "admin" else None
+    admin_id = student_owner_id(current_user)
+    grade_scope = assigned_grade_for_user(current_user)
 
     if "last_bulk_import" in st.session_state:
         st.subheader("Last bulk import")
@@ -74,9 +90,11 @@ def render(current_user: dict) -> None:
         st.divider()
 
     with get_db_session() as session:
-        student_options = list_student_options(session, admin_user_id=admin_id)
-        summary = academic_record_summary(session)
-        recent_records = list_recent_academic_records(session, limit=25)
+        student_options = list_student_options(
+            session, admin_user_id=admin_id, assigned_grade=grade_scope
+        )
+        summary = academic_record_summary(session, admin_user_id=admin_id)
+        recent_records = list_recent_academic_records(session, limit=25, admin_user_id=admin_id)
 
     m1, m2 = st.columns(2)
     m1.metric("Students with records", summary["students_with_records"])

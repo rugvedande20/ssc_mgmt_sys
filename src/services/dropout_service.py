@@ -156,7 +156,12 @@ def list_recent_predictions(session, limit: int = 50) -> list[dict[str, Any]]:
     ]
 
 
-def list_latest_predictions_per_student(session, limit: int = 100) -> list[dict[str, Any]]:
+def list_latest_predictions_per_student(
+    session,
+    limit: int = 100,
+    assigned_grade: int | None = None,
+    admin_user_id: int | None = None,
+) -> list[dict[str, Any]]:
     latest_prediction_subquery = (
         select(
             DropoutPrediction.student_id,
@@ -168,7 +173,7 @@ def list_latest_predictions_per_student(session, limit: int = 100) -> list[dict[
         .subquery()
     )
 
-    rows = session.execute(
+    stmt = (
         select(
             User.id,
             User.full_name,
@@ -185,9 +190,14 @@ def list_latest_predictions_per_student(session, limit: int = 100) -> list[dict[
             latest_prediction_subquery.c.prediction_rank == 1,
             User.full_name != EXCLUDED_STUDENT_NAME,
         )
-        .order_by(desc(DropoutPrediction.risk_score))
-        .limit(limit)
-    ).all()
+    )
+    if admin_user_id is not None:
+        stmt = stmt.where(User.created_by_admin_id == admin_user_id)
+    if assigned_grade is not None:
+        stmt = stmt.join(StudentProfile, StudentProfile.user_id == User.id).where(
+            StudentProfile.semester == int(assigned_grade)
+        )
+    rows = session.execute(stmt.order_by(desc(DropoutPrediction.risk_score)).limit(limit)).all()
 
     return [
         {

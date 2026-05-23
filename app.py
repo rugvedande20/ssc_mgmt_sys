@@ -28,6 +28,8 @@ ADMIN_PAGES = [
     "Interventions",
 ]
 
+SUPERADMIN_USER_PAGES = ["User Management"]
+
 STUDENT_PAGES = [
     "Dashboard",
     "Profile",
@@ -61,7 +63,9 @@ def _student_page_options(user_id: int) -> list[str]:
 
 
 def page_options_for(user: dict) -> list[str]:
-    if user["role"] == "admin":
+    if user["role"] == "superadmin" and user.get("portal") == "users":
+        return SUPERADMIN_USER_PAGES
+    if user["role"] in ("admin", "superadmin"):
         return ADMIN_PAGES
     return _student_page_options(user["id"])
 
@@ -74,7 +78,7 @@ def render_sidebar(user: dict | None) -> str | None:
         f"""
         <div class="sidebar-account">
           <strong>{user["full_name"]}</strong><br/>
-          <span style="color:#64748b;font-size:0.85rem;">{user["role"].title()}</span>
+          <span style="color:#64748b;font-size:0.85rem;">{user["role"].replace("_", " ").title()}</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -101,7 +105,13 @@ def render_page(page_name: str, user: dict | None) -> None:
         login.render()
         return
 
-    if user["role"] == "admin":
+    if user["role"] == "superadmin" and user.get("portal") == "users":
+        from ui.pages import user_management
+
+        user_management.render(user)
+        return
+
+    if user["role"] in ("admin", "superadmin"):
         from ui.pages import (
             admin_dashboard,
             data_upload,
@@ -114,8 +124,8 @@ def render_page(page_name: str, user: dict | None) -> None:
             "Dashboard": lambda: admin_dashboard.render(user),
             "Student Management": lambda: student_management.render(user),
             "Academic Data Upload": lambda: data_upload.render(user),
-            "Dropout Analysis": dropout_analysis.render,
-            "Interventions": interventions.render,
+            "Dropout Analysis": lambda: dropout_analysis.render(user),
+            "Interventions": lambda: interventions.render(user),
         }
         admin_pages.get(page_name, lambda: admin_dashboard.render(user))()
         return
