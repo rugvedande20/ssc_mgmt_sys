@@ -4,7 +4,8 @@ import json
 
 from sqlalchemy import desc, select
 
-from src.db.models import PsychometricAttempt
+from src.db.models import PsychometricAttempt, User
+from src.utils.activity import ACTIVITY_BY_UNKNOWN
 from src.utils.datetime_ist import format_datetime_ist
 from src.psychometric.questions import QUESTION_BANK
 from src.psychometric.scoring import format_scores_json, score_riasec_responses
@@ -36,6 +37,8 @@ def get_latest_attempt(session, student_id: int) -> PsychometricAttempt | None:
 
 
 def list_recent_attempts(session, student_id: int, limit: int = 5) -> list[dict]:
+    student = session.get(User, student_id)
+    activity_by = (student.full_name or student.username) if student else ACTIVITY_BY_UNKNOWN
     rows = session.execute(
         select(PsychometricAttempt)
         .where(PsychometricAttempt.student_id == student_id)
@@ -49,6 +52,7 @@ def list_recent_attempts(session, student_id: int, limit: int = 5) -> list[dict]
                 "submitted_at": format_datetime_ist(row.submitted_at),
                 "top_codes": row.top_codes,
                 "summary": row.summary,
+                "activity_by": activity_by,
             }
         )
     return attempts
@@ -64,9 +68,12 @@ def get_latest_attempt_payload(session, student_id: int) -> dict | None:
     attempt = get_latest_attempt(session, student_id)
     if not attempt:
         return None
+    student = session.get(User, student_id)
+    activity_by = (student.full_name or student.username) if student else ACTIVITY_BY_UNKNOWN
     return {
         "submitted_at": format_datetime_ist(attempt.submitted_at),
         "top_codes": attempt.top_codes,
         "summary": attempt.summary,
         "score_map": json.loads(attempt.riasec_scores),
+        "activity_by": activity_by,
     }

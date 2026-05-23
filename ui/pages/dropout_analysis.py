@@ -13,7 +13,7 @@ from src.utils.admin_context import (
     admin_page_subtitle,
     assigned_grade_for_user,
     grade_scope_label,
-    student_owner_id,
+    student_scope_for_user,
 )
 from ui.components.page_chrome import render_page_header
 from ui.components.model_evaluation import render_model_metrics_table
@@ -36,7 +36,7 @@ def render(current_user: dict | None = None) -> None:
         badge_variant="indigo",
     )
     grade_scope = assigned_grade_for_user(current_user)
-    owner_id = student_owner_id(current_user)
+    scope = student_scope_for_user(current_user)
 
     model_status = get_dropout_model_status()
 
@@ -66,7 +66,10 @@ def render(current_user: dict | None = None) -> None:
                 key="dropout_predict",
             ):
                 with get_db_session() as session:
-                    results = run_predictions_for_latest_records(session)
+                    results = run_predictions_for_latest_records(
+                        session,
+                        predicted_by_user_id=current_user["id"] if current_user else None,
+                    )
                 if results:
                     st.success(f"Scored {len(results)} student(s).")
                 else:
@@ -74,12 +77,7 @@ def render(current_user: dict | None = None) -> None:
                 st.rerun()
 
     with get_db_session() as session:
-        latest_predictions = list_latest_predictions_per_student(
-            session,
-            limit=100,
-            assigned_grade=grade_scope,
-            admin_user_id=owner_id,
-        )
+        latest_predictions = list_latest_predictions_per_student(session, limit=100, **scope)
 
     if not latest_predictions:
         st.info("No predictions yet. Train the model and run predictions.")
@@ -88,7 +86,14 @@ def render(current_user: dict | None = None) -> None:
     with section("Latest predictions", "Summary table and risk distribution chart."):
         show_dataframe(
             latest_predictions,
-            columns=["student_name", "username", "risk_score", "risk_level", "predicted_at"],
+            columns=[
+                "student_name",
+                "username",
+                "risk_score",
+                "risk_level",
+                "predicted_at",
+                "activity_by",
+            ],
         )
         chart = risk_distribution_chart(latest_predictions)
         if chart:

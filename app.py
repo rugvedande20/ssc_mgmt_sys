@@ -5,10 +5,11 @@ os.environ.setdefault("TZ", "Asia/Kolkata")
 import streamlit as st
 
 from config.settings import settings
-from src.auth.guards import get_current_user, init_session_state, logout_user
+from src.auth.guards import get_current_user, init_session_state
 from src.db.database import Base, apply_schema_patches, get_database_mode, get_engine, get_db_session
 from src.db import models as _db_models  # noqa: F401 — register ORM tables
 from src.db.seed import remove_legacy_demo_student, seed_demo_data
+from ui.components.sidebar_footer import render_logout_button, render_superadmin_portal_switch
 from ui.components.sidebar_nav import render_sidebar_nav
 from ui.components.theme import inject_app_theme, render_app_hero
 
@@ -28,7 +29,7 @@ ADMIN_PAGES = [
     "Interventions",
 ]
 
-SUPERADMIN_USER_PAGES = ["User Management"]
+SUPERADMIN_USER_PAGES = ["Dashboard", "User Creation", "User Management"]
 
 STUDENT_PAGES = [
     "Dashboard",
@@ -90,10 +91,8 @@ def render_sidebar(user: dict | None) -> str | None:
     page_name = render_sidebar_nav(page_options_for(user))
 
     st.sidebar.divider()
-    if st.sidebar.button("Logout", use_container_width=True, key="sidebar_logout"):
-        logout_user()
-        st.session_state.pop("nav_page", None)
-        st.rerun()
+    render_superadmin_portal_switch(user)
+    render_logout_button()
 
     return page_name
 
@@ -106,9 +105,14 @@ def render_page(page_name: str, user: dict | None) -> None:
         return
 
     if user["role"] == "superadmin" and user.get("portal") == "users":
-        from ui.pages import user_management
+        from ui.pages import superadmin_dashboard, user_creation, user_management
 
-        user_management.render(user)
+        superadmin_pages = {
+            "Dashboard": lambda: superadmin_dashboard.render(user),
+            "User Management": lambda: user_management.render(user),
+            "User Creation": lambda: user_creation.render(user),
+        }
+        superadmin_pages.get(page_name, lambda: superadmin_dashboard.render(user))()
         return
 
     if user["role"] in ("admin", "superadmin"):

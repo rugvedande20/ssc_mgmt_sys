@@ -45,14 +45,23 @@ def seed_demo_data(session) -> None:
                 first_name="Super",
                 last_name="Admin",
                 email="superadmin@ssc.local",
+                contact_phone="9000000000",
                 password_hash=hash_password("superadmin@123"),
                 role="superadmin",
+                assigned_grade=6,
                 is_active=True,
             )
         )
+    else:
+        existing_superadmin.assigned_grade = 6
+        if not existing_superadmin.contact_phone:
+            existing_superadmin.contact_phone = "9000000000"
 
     existing_admin = session.scalar(select(User).where(User.username == "admin"))
-    if not existing_admin:
+    if existing_admin:
+        existing_admin.assigned_grade = 6
+        existing_admin.contact_phone = "8459201018"
+    else:
         session.add(
             User(
                 username="admin",
@@ -60,6 +69,7 @@ def seed_demo_data(session) -> None:
                 first_name="Ananya",
                 last_name="Sharma",
                 email="admin@demo.edu",
+                contact_phone="8459201018",
                 password_hash=hash_password("Admin@123"),
                 role="admin",
                 assigned_grade=6,

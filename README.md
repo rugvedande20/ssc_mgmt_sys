@@ -4,17 +4,17 @@ A Streamlit app for **Indian school students in Class 6–10** (upper primary / 
 
 ## Features
 
-- **Super Admin:** staff account management (create/edit/deactivate admins and superadmins)
-- **Class-scoped admins:** dashboards and student tools default to their assigned class (6–10)
+- **Super Admin:** staff overview dashboard, user creation, and user management
+- **Class-scoped staff:** admins and superadmins assigned to a class share the same student cohort when a class admin exists; otherwise the superadmin works in an independent workspace for that class
 - **Students:** school profile, interest assessment (RIASEC-style), career ideas and roadmaps
 - **Dropout risk:** train and run predictions on uploaded term marks and attendance
-- **Academic data:** CSV bulk upload and per-student manual entry
+- **Change password:** staff and students update passwords from their dashboard using the current password
 
 ## Roles
 
 | Role | Access |
 |------|--------|
-| **Super Admin** | Sign-in choice: **Admin UI** (same as class admin) or **User Management** (staff accounts) |
+| **Super Admin** | Sign-in choice: **Admin UI** (class operations) or **User Management** (staff accounts) |
 | **Admin** | Dashboard, students, uploads, dropout analysis — scoped to assigned class |
 | **Student** | Profile, assessment, career ideas |
 
@@ -33,30 +33,24 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Demo credentials
+## Access and passwords
 
-| Account | Username | Password | Notes |
-|---------|----------|----------|--------|
-| Super Admin | `superadmin` | `superadmin@123` | Choose **Admin UI** or **User Management** at sign-in |
-| Class admin (demo) | `admin` | `Admin@123` | Defaults to **Class 6** |
-| New staff | *(auto-generated)* | `anasha@123` | Created in User Management; username like `anasha_admin6` for Ananya Sharma, Class 6 |
+Passwords are **not** listed in this repository. Staff and students can open **Change password** on their dashboard (current password + new password).
 
-Students are created by admins under **Student Management** (no default student login).
-
-### Staff username format
-
-- **Admin:** first 3 letters of first name + first 3 of last name + `_admin` + class number — e.g. `anasha_admin6`
-- **Super Admin:** same prefix + `_superadmin` — e.g. `anasha_superadmin`
-- **Password:** first 3 letters of first name + first 3 of last name + `@123` — e.g. `anasha@123`
+New staff accounts are created in **User Creation**; share the generated **username** and initial password through your secure onboarding process.
 
 ## Demo flow
 
-1. **Super Admin** → User Management → add admins for each class
-2. **Admin** → Student Management → create Class 6–10 students → download CSV template → upload marks
+1. **Super Admin** → **User Creation** → add admins per class
+2. **Admin** → **Student Management** → create students → upload marks
 3. **Dropout Analysis** → train model → run predictions
 4. **Student** → complete profile → interest assessment → career ideas
 
 Restart the app after upgrades; legacy demo student data is removed on startup.
+
+## Project layout
+
+See [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) for how the repository is organized.
 
 ## Deploy on Streamlit Community Cloud
 

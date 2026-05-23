@@ -3,9 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from sqlalchemy import desc, func, select
+from sqlalchemy.orm import aliased
 
 from config.school_context import income_band_for_dropout_model
 from src.db.models import AcademicRecord, DropoutPrediction, StudentProfile, User
+from src.utils.activity import ACTIVITY_BY_UNKNOWN
+from src.utils.admin_context import student_grade_scope_filters
 from src.utils.datetime_ist import format_datetime_ist
 
 EXCLUDED_STUDENT_NAME = "Rahul Verma"
@@ -81,7 +84,11 @@ def build_prediction_candidates(session) -> list[dict[str, Any]]:
     return candidates
 
 
-def run_predictions_for_latest_records(session) -> list[dict[str, Any]]:
+def run_predictions_for_latest_records(
+    session,
+    *,
+    predicted_by_user_id: int | None = None,
+) -> list[dict[str, Any]]:
     from src.ml.predict_dropout import predict_dropout_batch
 
     candidates = build_prediction_candidates(session)
@@ -120,6 +127,7 @@ def run_predictions_for_latest_records(session) -> list[dict[str, Any]]:
             risk_score=prediction["risk_score"],
             risk_level=prediction["risk_level"],
             top_factors=explanation,
+            predicted_by_user_id=predicted_by_user_id,
         )
         session.add(prediction_row)
         results.append(
@@ -137,9 +145,20 @@ def run_predictions_for_latest_records(session) -> list[dict[str, Any]]:
 
 
 def list_recent_predictions(session, limit: int = 50) -> list[dict[str, Any]]:
+    Actor = aliased(User)
     rows = session.execute(
-        select(User.full_name, User.username, DropoutPrediction.risk_score, DropoutPrediction.risk_level, DropoutPrediction.top_factors, DropoutPrediction.predicted_at)
+        select(
+            User.full_name,
+            User.username,
+            DropoutPrediction.risk_score,
+            DropoutPrediction.risk_level,
+            DropoutPrediction.top_factors,
+            DropoutPrediction.predicted_at,
+            Actor.full_name.label("actor_full_name"),
+            Actor.username.label("actor_username"),
+        )
         .join(DropoutPrediction, DropoutPrediction.student_id == User.id)
+        .outerjoin(Actor, Actor.id == DropoutPrediction.predicted_by_user_id)
         .order_by(desc(DropoutPrediction.predicted_at))
         .limit(limit)
     ).all()
@@ -151,6 +170,7 @@ def list_recent_predictions(session, limit: int = 50) -> list[dict[str, Any]]:
             "risk_level": row.risk_level,
             "top_factors": row.top_factors,
             "predicted_at": format_datetime_ist(row.predicted_at),
+            "activity_by": row.actor_full_name or row.actor_username or ACTIVITY_BY_UNKNOWN,
         }
         for row in rows
     ]
@@ -160,7 +180,7 @@ def list_latest_predictions_per_student(
     session,
     limit: int = 100,
     assigned_grade: int | None = None,
-    admin_user_id: int | None = None,
+    created_by_admin_id: int | None = None,
 ) -> list[dict[str, Any]]:
     latest_prediction_subquery = (
         select(
@@ -173,6 +193,7 @@ def list_latest_predictions_per_student(
         .subquery()
     )
 
+    Actor = aliased(User)
     stmt = (
         select(
             User.id,
@@ -182,20 +203,23 @@ def list_latest_predictions_per_student(
             DropoutPrediction.risk_level,
             DropoutPrediction.top_factors,
             DropoutPrediction.predicted_at,
+            Actor.full_name.label("actor_full_name"),
+            Actor.username.label("actor_username"),
         )
         .join(latest_prediction_subquery, latest_prediction_subquery.c.student_id == User.id)
         .join(DropoutPrediction, DropoutPrediction.id == latest_prediction_subquery.c.id)
+        .outerjoin(Actor, Actor.id == DropoutPrediction.predicted_by_user_id)
         .where(
             User.role == "student",
             latest_prediction_subquery.c.prediction_rank == 1,
             User.full_name != EXCLUDED_STUDENT_NAME,
         )
     )
-    if admin_user_id is not None:
-        stmt = stmt.where(User.created_by_admin_id == admin_user_id)
-    if assigned_grade is not None:
-        stmt = stmt.join(StudentProfile, StudentProfile.user_id == User.id).where(
-            StudentProfile.semester == int(assigned_grade)
+    if created_by_admin_id is not None:
+        stmt = stmt.where(User.created_by_admin_id == created_by_admin_id)
+    elif assigned_grade is not None:
+        stmt = stmt.outerjoin(StudentProfile, StudentProfile.user_id == User.id).where(
+            *student_grade_scope_filters(session, assigned_grade)
         )
     rows = session.execute(stmt.order_by(desc(DropoutPrediction.risk_score)).limit(limit)).all()
 
@@ -208,6 +232,7 @@ def list_latest_predictions_per_student(
             "risk_level": row.risk_level,
             "top_factors": row.top_factors,
             "predicted_at": format_datetime_ist(row.predicted_at),
+            "activity_by": row.actor_full_name or row.actor_username or ACTIVITY_BY_UNKNOWN,
         }
         for row in rows
     ]

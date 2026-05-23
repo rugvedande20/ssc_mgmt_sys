@@ -5,6 +5,7 @@ from typing import Any
 import streamlit as st
 
 from config.school_context import ACADEMIC_FIELD_LABELS, PROFILE_FIELD_LABELS, format_class
+from ui.components.activity_meta import render_activity_caption
 from ui.components.risk_display import format_display_value, render_factor_list, risk_level_badge
 
 
@@ -42,6 +43,13 @@ def render_profile_tab(profile: dict[str, Any] | None) -> None:
             ]
         )
 
+    if profile.get("updated_at"):
+        render_activity_caption(
+            at=profile.get("updated_at"),
+            at_label="Profile updated",
+            by=profile.get("activity_by"),
+        )
+
     st.markdown("**Interests and strengths**")
     int_col, str_col = st.columns(2)
     with int_col:
@@ -75,6 +83,7 @@ def render_academic_tab(academic: dict[str, Any] | None) -> None:
         academic.get("stress_level", "—"),
     )
     m7.metric("Last updated", academic.get("recorded_at", "—"))
+    render_activity_caption(by=academic.get("activity_by"))
 
 
 def render_risk_tab(prediction: dict[str, Any] | None) -> None:
@@ -89,6 +98,7 @@ def render_risk_tab(prediction: dict[str, Any] | None) -> None:
         st.markdown("**Risk level**")
         st.markdown(risk_level_badge(str(level)), unsafe_allow_html=True)
     c3.metric("Predicted at", prediction.get("predicted_at", "—"))
+    render_activity_caption(by=prediction.get("activity_by"))
 
     with st.container(border=True):
         st.markdown("**Why this rating?**")
@@ -117,3 +127,4 @@ def render_psychometric_tab(psych: dict[str, Any] | None) -> None:
             st.write("—")
     with col2:
         st.metric("Submitted", psych.get("submitted_at", "—"))
+        render_activity_caption(by=psych.get("activity_by"))

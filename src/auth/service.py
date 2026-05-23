@@ -1,6 +1,7 @@
 from sqlalchemy import select
 
 from src.auth.hashing import verify_password
+from src.db import models as _db_models  # noqa: F401 — register all ORM relationships
 from src.db.models import User
 
 

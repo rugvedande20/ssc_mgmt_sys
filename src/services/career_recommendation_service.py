@@ -8,14 +8,10 @@ from typing import Any
 from sqlalchemy import desc, func, select
 
 from config.constants import RIASEC_TYPES, TARGET_GRADE_MAX
-from src.db.models import (
-    AcademicRecord,
-    CareerGuidanceSnapshot,
-    CareerRecommendation,
-    PsychometricAttempt,
-)
+from src.db.models import AcademicRecord, CareerGuidanceSnapshot, CareerRecommendation, PsychometricAttempt
 from src.ml.career_matcher import build_class_10_report, match_careers_for_student
 from src.services.student_service import get_student_profile_payload
+from src.utils.activity import ACTIVITY_BY_UNKNOWN, resolve_actor_name
 
 
 def _parse_riasec_scores(raw: str) -> dict[str, float]:
@@ -82,6 +78,9 @@ def list_guidance_history(session, student_id: int, limit: int = 8) -> list[dict
             "student_class": row.student_class,
             "summary": row.summary,
             "generated_at": format_datetime_ist(row.generated_at),
+            "activity_by": resolve_actor_name(session, row.generated_by_user_id)
+            if row.generated_by_user_id
+            else ACTIVITY_BY_UNKNOWN,
         }
         for row in rows
     ]
@@ -119,7 +118,13 @@ def get_recommendations_for_snapshot(
     ]
 
 
-def generate_career_guidance(session, student_id: int) -> dict[str, Any]:
+def generate_career_guidance(
+    session,
+    student_id: int,
+    *,
+    generated_by_user_id: int | None = None,
+) -> dict[str, Any]:
+    actor_id = generated_by_user_id if generated_by_user_id is not None else student_id
     profile = get_student_profile_payload(session, student_id)
     student_class = int(profile.get("semester")) if profile and profile.get("semester") else None
 
@@ -198,6 +203,7 @@ def generate_career_guidance(session, student_id: int) -> dict[str, Any]:
         report_json=json.dumps(report),
         labour_horizon_years=int(meta.get("horizon_years", 5)),
         generated_at=now_ist(),
+        generated_by_user_id=actor_id,
     )
     session.add(snapshot)
     session.flush()
@@ -225,6 +231,7 @@ def generate_career_guidance(session, student_id: int) -> dict[str, Any]:
         "report": report,
         "recommendations": get_recommendations_for_snapshot(session, student_id, snapshot.id),
         "generated_at": format_datetime_ist(snapshot.generated_at),
+        "activity_by": resolve_actor_name(session, actor_id),
     }
 
 
@@ -248,6 +255,9 @@ def get_student_career_payload(session, student_id: int) -> dict[str, Any]:
             "student_class": snapshot.student_class,
             "summary": snapshot.summary,
             "generated_at": format_datetime_ist(snapshot.generated_at),
+            "activity_by": resolve_actor_name(session, snapshot.generated_by_user_id)
+            if snapshot.generated_by_user_id
+            else ACTIVITY_BY_UNKNOWN,
             "report": report,
         },
         "recommendations": recommendations,

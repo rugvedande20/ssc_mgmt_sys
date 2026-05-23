@@ -9,8 +9,9 @@ from src.utils.admin_context import (
     admin_page_subtitle,
     assigned_grade_for_user,
     grade_scope_label,
-    student_owner_id,
+    student_scope_for_user,
 )
+from ui.components.change_password_panel import render_change_password_panel
 from ui.components.layout import section
 from ui.components.page_chrome import render_page_header
 from ui.components.risk_display import _count_by_level, exclude_removed_students
@@ -27,31 +28,25 @@ def render(current_user: dict) -> None:
         badge_variant="indigo",
     )
 
-    grade_scope = assigned_grade_for_user(current_user)
-    owner_id = student_owner_id(current_user)
+    scope = student_scope_for_user(current_user)
     with get_db_session() as session:
-        counts = get_dashboard_counts(
-            session, assigned_grade=grade_scope, admin_user_id=owner_id
-        )
+        counts = get_dashboard_counts(session, **scope)
         student_filters = [User.role == "student"]
-        if owner_id is not None:
-            student_filters.append(User.created_by_admin_id == owner_id)
-        student_query = select(User.full_name, User.email).where(*student_filters)
-        if grade_scope is not None:
+        if scope.get("created_by_admin_id") is not None:
+            student_filters.append(User.created_by_admin_id == scope["created_by_admin_id"])
+            student_query = select(User.full_name, User.email).where(*student_filters)
+        elif scope.get("assigned_grade") is not None:
             from src.db.models import StudentProfile
 
             student_query = (
                 select(User.full_name, User.email)
                 .join(StudentProfile, StudentProfile.user_id == User.id)
-                .where(*student_filters, StudentProfile.semester == grade_scope)
+                .where(*student_filters, StudentProfile.semester == scope["assigned_grade"])
             )
+        else:
+            student_query = select(User.full_name, User.email).where(*student_filters)
         students = session.execute(student_query.order_by(User.full_name.asc())).all()
-        predictions = list_latest_predictions_per_student(
-            session,
-            limit=100,
-            assigned_grade=grade_scope,
-            admin_user_id=owner_id,
-        )
+        predictions = list_latest_predictions_per_student(session, limit=100, **scope)
 
     metric_cols = st.columns(4)
     metric_cols[0].metric("Students", counts["total_students"])
@@ -73,10 +68,11 @@ def render(current_user: dict) -> None:
                             "risk_score": row["risk_score"],
                             "risk_level": row["risk_level"],
                             "predicted_at": row["predicted_at"],
+                            "activity_by": row.get("activity_by"),
                         }
                         for row in predictions
                     ],
-                    columns=["student_name", "risk_score", "risk_level", "predicted_at"],
+                    columns=["student_name", "risk_score", "risk_level", "predicted_at", "activity_by"],
                 )
             else:
                 st.info("No predictions yet. Upload data, train the model, and run predictions.")
@@ -107,3 +103,6 @@ def render(current_user: dict) -> None:
                 st.session_state["nav_page"] = "Dropout Analysis"
                 st.session_state["focus_risk_explanations"] = True
                 st.rerun()
+
+    with section("Account security", "Update your sign-in password."):
+        render_change_password_panel(current_user, key_prefix="admin_dash_pwd")

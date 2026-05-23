@@ -24,12 +24,31 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now_ist, nullable=False)
     created_by_admin_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
 
-    student_profile: Mapped["StudentProfile"] = relationship(back_populates="user", uselist=False)
-    academic_records: Mapped[list["AcademicRecord"]] = relationship(back_populates="student")
-    dropout_predictions: Mapped[list["DropoutPrediction"]] = relationship(back_populates="student")
-    psychometric_attempts: Mapped[list["PsychometricAttempt"]] = relationship(back_populates="student")
-    career_recommendations: Mapped[list["CareerRecommendation"]] = relationship(back_populates="student")
-    career_guidance_snapshots: Mapped[list["CareerGuidanceSnapshot"]] = relationship(back_populates="student")
+    student_profile: Mapped["StudentProfile"] = relationship(
+        back_populates="user",
+        uselist=False,
+        foreign_keys="StudentProfile.user_id",
+    )
+    academic_records: Mapped[list["AcademicRecord"]] = relationship(
+        back_populates="student",
+        foreign_keys="AcademicRecord.student_id",
+    )
+    dropout_predictions: Mapped[list["DropoutPrediction"]] = relationship(
+        back_populates="student",
+        foreign_keys="DropoutPrediction.student_id",
+    )
+    psychometric_attempts: Mapped[list["PsychometricAttempt"]] = relationship(
+        back_populates="student",
+        foreign_keys="PsychometricAttempt.student_id",
+    )
+    career_recommendations: Mapped[list["CareerRecommendation"]] = relationship(
+        back_populates="student",
+        foreign_keys="CareerRecommendation.student_id",
+    )
+    career_guidance_snapshots: Mapped[list["CareerGuidanceSnapshot"]] = relationship(
+        back_populates="student",
+        foreign_keys="CareerGuidanceSnapshot.student_id",
+    )
     intervention_logs: Mapped[list["InterventionLog"]] = relationship(
         back_populates="student",
         foreign_keys="InterventionLog.student_id",
@@ -37,6 +56,16 @@ class User(Base):
     admin_actions: Mapped[list["InterventionLog"]] = relationship(
         foreign_keys="InterventionLog.admin_user_id",
     )
+
+
+class PasswordResetOtp(Base):
+    __tablename__ = "password_reset_otps"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    otp_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_ist, nullable=False)
 
 
 class StudentProfile(Base):
@@ -57,8 +86,12 @@ class StudentProfile(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=now_ist, onupdate=now_ist, nullable=False
     )
+    updated_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
 
-    user: Mapped[User] = relationship(back_populates="student_profile")
+    user: Mapped[User] = relationship(
+        back_populates="student_profile",
+        foreign_keys=[user_id],
+    )
 
 
 class AcademicRecord(Base):
@@ -77,8 +110,12 @@ class AcademicRecord(Base):
     engagement_score: Mapped[float | None] = mapped_column(Float)
     stress_level: Mapped[float | None] = mapped_column(Float)
     recorded_at: Mapped[datetime] = mapped_column(DateTime, default=now_ist, nullable=False)
+    recorded_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
 
-    student: Mapped[User] = relationship(back_populates="academic_records")
+    student: Mapped[User] = relationship(
+        back_populates="academic_records",
+        foreign_keys=[student_id],
+    )
 
 
 class DropoutPrediction(Base):
@@ -90,8 +127,12 @@ class DropoutPrediction(Base):
     risk_level: Mapped[str] = mapped_column(String(20), nullable=False)
     top_factors: Mapped[str] = mapped_column(Text, nullable=False)
     predicted_at: Mapped[datetime] = mapped_column(DateTime, default=now_ist, nullable=False)
+    predicted_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
 
-    student: Mapped[User] = relationship(back_populates="dropout_predictions")
+    student: Mapped[User] = relationship(
+        back_populates="dropout_predictions",
+        foreign_keys=[student_id],
+    )
 
 
 class PsychometricAttempt(Base):
@@ -104,7 +145,10 @@ class PsychometricAttempt(Base):
     top_codes: Mapped[str] = mapped_column(String(50), nullable=False)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
 
-    student: Mapped[User] = relationship(back_populates="psychometric_attempts")
+    student: Mapped[User] = relationship(
+        back_populates="psychometric_attempts",
+        foreign_keys=[student_id],
+    )
 
 
 class CareerGuidanceSnapshot(Base):
@@ -118,8 +162,12 @@ class CareerGuidanceSnapshot(Base):
     report_json: Mapped[str] = mapped_column(Text, nullable=False)
     labour_horizon_years: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
     generated_at: Mapped[datetime] = mapped_column(DateTime, default=now_ist, nullable=False)
+    generated_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
 
-    student: Mapped[User] = relationship(back_populates="career_guidance_snapshots")
+    student: Mapped[User] = relationship(
+        back_populates="career_guidance_snapshots",
+        foreign_keys=[student_id],
+    )
     recommendations: Mapped[list["CareerRecommendation"]] = relationship(back_populates="guidance_snapshot")
 
 
@@ -139,7 +187,10 @@ class CareerRecommendation(Base):
     certifications: Mapped[str] = mapped_column(Text, nullable=False)
     generated_at: Mapped[datetime] = mapped_column(DateTime, default=now_ist, nullable=False)
 
-    student: Mapped[User] = relationship(back_populates="career_recommendations")
+    student: Mapped[User] = relationship(
+        back_populates="career_recommendations",
+        foreign_keys=[student_id],
+    )
     guidance_snapshot: Mapped["CareerGuidanceSnapshot | None"] = relationship(
         back_populates="recommendations"
     )

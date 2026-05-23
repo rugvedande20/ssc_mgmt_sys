@@ -14,6 +14,8 @@ def _letters_only(value: str) -> str:
 def build_staff_username(first_name: str, last_name: str, role: str, assigned_grade: int | None) -> str:
     prefix = build_name_prefix(first_name, last_name)
     if role == "superadmin":
+        if assigned_grade is not None:
+            return f"{prefix}_superadmin{int(assigned_grade)}"
         return f"{prefix}_superadmin"
     grade = int(assigned_grade) if assigned_grade is not None else 6
     return f"{prefix}_admin{grade}"

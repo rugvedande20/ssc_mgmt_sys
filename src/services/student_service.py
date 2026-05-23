@@ -4,15 +4,20 @@ from typing import Any
 
 import pandas as pd
 from sqlalchemy import desc, func, or_, select
+from sqlalchemy.orm import aliased
 
 from src.auth.hashing import hash_password
 from src.services.student_credentials import (
     allocate_unique_username,
     build_login_password,
-    build_login_username,
     build_student_email,
+    import_row_identity_key,
+    login_username_base_for_import,
+    normalize_full_name_key,
+    normalize_student_slug,
     resolve_student_name,
 )
+from src.utils.admin_context import student_grade_scope_filters
 from config.school_context import (
     ACADEMIC_CSV_ALIASES,
     ACADEMIC_DB_COLUMNS,
@@ -27,7 +32,8 @@ def _format_class_label(grade: int | None) -> str:
     if grade is None:
         return "—"
     return format_class(int(grade))
-from src.utils.datetime_ist import format_datetime_ist
+from src.utils.activity import ACTIVITY_BY_UNKNOWN, resolve_actor_name
+from src.utils.datetime_ist import format_datetime_ist, now_ist
 from src.db.models import (
     AcademicRecord,
     CareerGuidanceSnapshot,
@@ -72,14 +78,27 @@ def get_student_profile_payload(session, user_id: int) -> dict[str, Any] | None:
         "internet_access": profile.internet_access or "",
         "interests_summary": profile.interests_summary or "",
         "strengths_summary": profile.strengths_summary or "",
+        "updated_at": format_datetime_ist(profile.updated_at),
+        "activity_by": resolve_actor_name(session, profile.updated_by_user_id)
+        if profile.updated_by_user_id
+        else ACTIVITY_BY_UNKNOWN,
     }
 
 
-def upsert_student_profile(session, user_id: int, profile_data: dict[str, Any]) -> StudentProfile:
+def upsert_student_profile(
+    session,
+    user_id: int,
+    profile_data: dict[str, Any],
+    *,
+    updated_by_user_id: int | None = None,
+) -> StudentProfile:
     profile = get_student_profile(session, user_id)
     if not profile:
         profile = StudentProfile(user_id=user_id)
         session.add(profile)
+
+    if updated_by_user_id is not None:
+        profile.updated_by_user_id = updated_by_user_id
 
     for field_name, default_value in PROFILE_DEFAULTS.items():
         raw_value = profile_data.get(field_name, default_value)
@@ -123,7 +142,12 @@ def create_student_user(
     )
     session.add(student)
     session.flush()
-    upsert_student_profile(session, student.id, profile_data)
+    upsert_student_profile(
+        session,
+        student.id,
+        profile_data,
+        updated_by_user_id=created_by_admin_id,
+    )
     return student
 
 
@@ -131,14 +155,14 @@ def list_students(
     session,
     search_term: str = "",
     limit: int = 100,
-    admin_user_id: int | None = None,
     assigned_grade: int | None = None,
+    created_by_admin_id: int | None = None,
 ) -> list[dict[str, Any]]:
     filters = [User.role == "student"]
-    if admin_user_id is not None:
-        filters.append(User.created_by_admin_id == admin_user_id)
-    if assigned_grade is not None:
-        filters.append(StudentProfile.semester == int(assigned_grade))
+    if created_by_admin_id is not None:
+        filters.append(User.created_by_admin_id == created_by_admin_id)
+    elif assigned_grade is not None:
+        filters.extend(student_grade_scope_filters(session, assigned_grade))
 
     query = (
         select(
@@ -196,17 +220,22 @@ def list_students(
 
 def list_student_options(
     session,
-    admin_user_id: int | None = None,
     assigned_grade: int | None = None,
+    created_by_admin_id: int | None = None,
 ) -> list[tuple[int, str]]:
     filters = [User.role == "student"]
-    if admin_user_id is not None:
-        filters.append(User.created_by_admin_id == admin_user_id)
+    if created_by_admin_id is not None:
+        rows = session.execute(
+            select(User.id, User.full_name)
+            .where(*filters, User.created_by_admin_id == created_by_admin_id)
+            .order_by(User.full_name.asc())
+        ).all()
+        return [(row.id, row.full_name) for row in rows]
     if assigned_grade is not None:
         query = (
             select(User.id, User.full_name)
-            .join(StudentProfile, StudentProfile.user_id == User.id)
-            .where(*filters, StudentProfile.semester == int(assigned_grade))
+            .outerjoin(StudentProfile, StudentProfile.user_id == User.id)
+            .where(*filters, *student_grade_scope_filters(session, assigned_grade))
             .order_by(User.full_name.asc())
         )
         rows = session.execute(query).all()
@@ -217,9 +246,16 @@ def list_student_options(
     return [(row.id, row.full_name) for row in rows]
 
 
-def add_academic_record(session, student_id: int, record_data: dict[str, Any]) -> AcademicRecord:
+def add_academic_record(
+    session,
+    student_id: int,
+    record_data: dict[str, Any],
+    *,
+    recorded_by_user_id: int | None = None,
+) -> AcademicRecord:
     record = AcademicRecord(
         student_id=student_id,
+        recorded_by_user_id=recorded_by_user_id,
         attendance_percentage=record_data.get("attendance_percentage"),
         cgpa=record_data.get("cgpa"),
         internal_marks=record_data.get("internal_marks"),
@@ -237,8 +273,12 @@ def add_academic_record(session, student_id: int, record_data: dict[str, Any]) -
 
 
 def list_recent_academic_records(
-    session, limit: int = 50, admin_user_id: int | None = None
+    session,
+    limit: int = 50,
+    assigned_grade: int | None = None,
+    created_by_admin_id: int | None = None,
 ) -> list[dict[str, Any]]:
+    Actor = aliased(User)
     stmt = (
         select(
             User.full_name,
@@ -246,12 +286,19 @@ def list_recent_academic_records(
             AcademicRecord.cgpa,
             AcademicRecord.backlog_count,
             AcademicRecord.recorded_at,
+            Actor.full_name.label("actor_full_name"),
+            Actor.username.label("actor_username"),
         )
         .join(AcademicRecord, AcademicRecord.student_id == User.id)
+        .outerjoin(Actor, Actor.id == AcademicRecord.recorded_by_user_id)
         .where(User.role == "student")
     )
-    if admin_user_id is not None:
-        stmt = stmt.where(User.created_by_admin_id == admin_user_id)
+    if created_by_admin_id is not None:
+        stmt = stmt.where(User.created_by_admin_id == created_by_admin_id)
+    elif assigned_grade is not None:
+        stmt = stmt.outerjoin(StudentProfile, StudentProfile.user_id == User.id).where(
+            *student_grade_scope_filters(session, assigned_grade)
+        )
     rows = session.execute(stmt.order_by(desc(AcademicRecord.recorded_at)).limit(limit)).all()
     return [
         {
@@ -260,6 +307,7 @@ def list_recent_academic_records(
             "overall_marks_pct": row.cgpa,
             "subjects_below_passing": row.backlog_count,
             "recorded_at": format_datetime_ist(row.recorded_at),
+            "activity_by": row.actor_full_name or row.actor_username or ACTIVITY_BY_UNKNOWN,
         }
         for row in rows
     ]
@@ -321,8 +369,12 @@ def list_students_with_latest_records(session) -> list[dict[str, Any]]:
     ]
 
 
-def academic_record_summary(session, admin_user_id: int | None = None) -> dict[str, int]:
-    if admin_user_id is None:
+def academic_record_summary(
+    session,
+    assigned_grade: int | None = None,
+    created_by_admin_id: int | None = None,
+) -> dict[str, int]:
+    if assigned_grade is None and created_by_admin_id is None:
         return {
             "students_with_records": session.scalar(
                 select(func.count(func.distinct(AcademicRecord.student_id))).select_from(AcademicRecord)
@@ -331,24 +383,47 @@ def academic_record_summary(session, admin_user_id: int | None = None) -> dict[s
             "total_records": session.scalar(select(func.count()).select_from(AcademicRecord)) or 0,
         }
 
-    students_with_records = (
-        session.scalar(
-            select(func.count(func.distinct(AcademicRecord.student_id)))
-            .select_from(AcademicRecord)
-            .join(User, User.id == AcademicRecord.student_id)
-            .where(User.created_by_admin_id == admin_user_id)
+    if created_by_admin_id is not None:
+        students_with_records = (
+            session.scalar(
+                select(func.count(func.distinct(AcademicRecord.student_id)))
+                .select_from(AcademicRecord)
+                .join(User, User.id == AcademicRecord.student_id)
+                .where(User.created_by_admin_id == created_by_admin_id)
+            )
+            or 0
         )
-        or 0
-    )
-    total_records = (
-        session.scalar(
-            select(func.count())
-            .select_from(AcademicRecord)
-            .join(User, User.id == AcademicRecord.student_id)
-            .where(User.created_by_admin_id == admin_user_id)
+        total_records = (
+            session.scalar(
+                select(func.count())
+                .select_from(AcademicRecord)
+                .join(User, User.id == AcademicRecord.student_id)
+                .where(User.created_by_admin_id == created_by_admin_id)
+            )
+            or 0
         )
-        or 0
-    )
+    else:
+        grade_filters = student_grade_scope_filters(session, assigned_grade)
+        students_with_records = (
+            session.scalar(
+                select(func.count(func.distinct(AcademicRecord.student_id)))
+                .select_from(AcademicRecord)
+                .join(User, User.id == AcademicRecord.student_id)
+                .outerjoin(StudentProfile, StudentProfile.user_id == User.id)
+                .where(*grade_filters)
+            )
+            or 0
+        )
+        total_records = (
+            session.scalar(
+                select(func.count())
+                .select_from(AcademicRecord)
+                .join(User, User.id == AcademicRecord.student_id)
+                .outerjoin(StudentProfile, StudentProfile.user_id == User.id)
+                .where(*grade_filters)
+            )
+            or 0
+        )
     return {
         "students_with_records": students_with_records,
         "total_records": total_records,
@@ -433,6 +508,7 @@ def get_student_overview(session, student_id: int) -> dict[str, Any] | None:
             "engagement_score": latest_record.engagement_score,
             "stress_level": latest_record.stress_level,
             "recorded_at": format_datetime_ist(latest_record.recorded_at),
+            "activity_by": resolve_actor_name(session, latest_record.recorded_by_user_id),
         },
         "latest_prediction": None
         if not latest_prediction
@@ -441,6 +517,7 @@ def get_student_overview(session, student_id: int) -> dict[str, Any] | None:
             "risk_level": latest_prediction.risk_level,
             "top_factors": latest_prediction.top_factors,
             "predicted_at": format_datetime_ist(latest_prediction.predicted_at),
+            "activity_by": resolve_actor_name(session, latest_prediction.predicted_by_user_id),
         },
         "latest_psychometric": None
         if not latest_attempt
@@ -448,6 +525,7 @@ def get_student_overview(session, student_id: int) -> dict[str, Any] | None:
             "top_codes": latest_attempt.top_codes,
             "summary": latest_attempt.summary,
             "submitted_at": format_datetime_ist(latest_attempt.submitted_at),
+            "activity_by": user.full_name or user.username,
         },
         "recommendation_count": recommendation_count,
         "guidance_history_count": session.scalar(
@@ -474,7 +552,11 @@ def _academic_record_from_row(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _optional_profile_fields_from_row(row: dict[str, Any]) -> dict[str, Any]:
+def _optional_profile_fields_from_row(
+    row: dict[str, Any],
+    *,
+    default_grade: int | None = None,
+) -> dict[str, Any]:
     profile: dict[str, Any] = {}
     school_name = row.get("school_name")
     if school_name not in (None, ""):
@@ -485,6 +567,8 @@ def _optional_profile_fields_from_row(row: dict[str, Any]) -> dict[str, Any]:
             profile["semester"] = int(class_grade)
         except (TypeError, ValueError):
             pass
+    elif default_grade is not None:
+        profile["semester"] = int(default_grade)
     return profile
 
 
@@ -494,31 +578,38 @@ def _get_or_create_student_for_import(
     admin_user_id: int,
     login_to_student_id: dict[str, int],
     import_batch_cache: dict[str, int],
+    *,
+    default_grade: int | None = None,
 ) -> tuple[int, dict[str, str] | None]:
     """Return student id and credential payload when a new account is created."""
     first, last, full_name = resolve_student_name(row)
-    base_username = build_login_username(first, last)
-    csv_slug = str(row.get("student_username", "")).strip().lower()
+    csv_slug = normalize_student_slug(row.get("student_username"))
+    import_key = import_row_identity_key(row)
+    login_base = login_username_base_for_import(row, first, last)
 
-    student_id = import_batch_cache.get(base_username)
+    student_id = import_batch_cache.get(import_key)
     if not student_id and csv_slug:
         student_id = login_to_student_id.get(csv_slug)
     if not student_id:
-        student_id = login_to_student_id.get(base_username)
+        student_id = login_to_student_id.get(login_base)
+
+    profile_kwargs = {"default_grade": default_grade}
 
     if student_id:
-        import_batch_cache[base_username] = student_id
-        if profile_fields := _optional_profile_fields_from_row(row):
+        import_batch_cache[import_key] = student_id
+        if csv_slug:
+            import_batch_cache[csv_slug] = student_id
+        if profile_fields := _optional_profile_fields_from_row(row, **profile_kwargs):
             upsert_student_profile(session, student_id, profile_fields)
         return student_id, None
 
-    login_username = allocate_unique_username(session, base_username)
+    login_username = allocate_unique_username(session, login_base)
     password = build_login_password(login_username)
     email = build_student_email(login_username)
     if username_or_email_exists(session, login_username, email):
         email = f"{login_username}.{admin_user_id}@students.local"
 
-    profile_data = _optional_profile_fields_from_row(row)
+    profile_data = _optional_profile_fields_from_row(row, **profile_kwargs)
     student = create_student_user(
         session,
         username=login_username,
@@ -533,7 +624,10 @@ def _get_or_create_student_for_import(
 
     student_id = student.id
     login_to_student_id[login_username] = student_id
-    import_batch_cache[base_username] = student_id
+    import_batch_cache[import_key] = student_id
+    if csv_slug:
+        import_batch_cache[csv_slug] = student_id
+        login_to_student_id[csv_slug] = student_id
 
     credentials = {
         "full_name": full_name,
@@ -542,6 +636,30 @@ def _get_or_create_student_for_import(
         "csv_label": csv_slug or f"{first}_{last}",
     }
     return student_id, credentials
+
+
+def _find_student_id_by_full_name(session, name_key: str) -> int | None:
+    rows = session.execute(select(User.id, User.full_name).where(User.role == "student")).all()
+    for user_id, full_name in rows:
+        if normalize_full_name_key(full_name) == name_key:
+            return user_id
+    return None
+
+
+def _import_row_matches_existing_student(
+    merged_row: dict[str, Any],
+    login_to_student_id: dict[str, int],
+    import_batch_cache: dict[str, int],
+) -> bool:
+    first, last, _ = resolve_student_name(merged_row)
+    import_key = import_row_identity_key(merged_row)
+    csv_slug = normalize_student_slug(merged_row.get("student_username"))
+    login_base = login_username_base_for_import(merged_row, first, last)
+    if import_batch_cache.get(import_key):
+        return True
+    if csv_slug and login_to_student_id.get(csv_slug):
+        return True
+    return bool(login_to_student_id.get(login_base))
 
 
 def bulk_import_students_from_csv(
@@ -564,6 +682,9 @@ def bulk_import_students_from_csv(
         friendly_missing = [DB_TO_SCHOOL_CSV_HEADER.get(col, col) for col in sorted(missing_columns)]
         raise ValueError(f"Missing required columns: {', '.join(friendly_missing)}")
 
+    admin = session.get(User, admin_user_id)
+    default_grade = int(admin.assigned_grade) if admin and admin.assigned_grade is not None else None
+
     login_to_student_id = {
         row.username: row.id
         for row in session.execute(select(User.username, User.id).where(User.role == "student")).all()
@@ -572,6 +693,8 @@ def bulk_import_students_from_csv(
 
     created_accounts: list[dict[str, str]] = []
     existing_accounts_used: list[str] = []
+    skipped_duplicate_names: list[str] = []
+    names_seen_in_file: set[str] = set()
     records_imported = 0
     row_errors: list[str] = []
 
@@ -582,31 +705,68 @@ def bulk_import_students_from_csv(
         merged_row = {**prepared_rows[index], **normalized_rows[index]}
         label = str(merged_row.get("student_username") or f"row {index + 2}")
         try:
+            _, _, full_name = resolve_student_name(merged_row)
+            name_key = normalize_full_name_key(full_name)
+
+            if name_key in names_seen_in_file:
+                skipped_duplicate_names.append(
+                    f"{label}: duplicate name «{full_name}» — only the first row in the file is "
+                    "imported; create the others manually under Student Management."
+                )
+                continue
+
+            if not _import_row_matches_existing_student(
+                merged_row, login_to_student_id, import_batch_cache
+            ):
+                existing_id = _find_student_id_by_full_name(session, name_key)
+                if existing_id is not None:
+                    skipped_duplicate_names.append(
+                        f"{label}: a student named «{full_name}» already exists — skipped to avoid "
+                        "duplicate accounts; add academic data manually or use their existing login slug."
+                    )
+                    continue
+
             student_id, credentials = _get_or_create_student_for_import(
                 session,
                 merged_row,
                 admin_user_id,
                 login_to_student_id,
                 import_batch_cache,
+                default_grade=default_grade,
             )
             if credentials:
                 created_accounts.append(credentials)
             else:
                 existing_accounts_used.append(label)
 
-            add_academic_record(session, student_id, _academic_record_from_row(normalized_rows[index]))
+            add_academic_record(
+                session,
+                student_id,
+                _academic_record_from_row(normalized_rows[index]),
+                recorded_by_user_id=admin_user_id,
+            )
+            names_seen_in_file.add(name_key)
             records_imported += 1
         except Exception as exc:
             row_errors.append(f"{label}: {exc}")
 
     session.flush()
+    imported_at = format_datetime_ist(now_ist())
+    activity_by = (
+        (admin.full_name or admin.username)
+        if admin
+        else resolve_actor_name(session, admin_user_id)
+    )
     return {
         "total_rows": total_rows,
         "records_imported": records_imported,
         "students_created": len(created_accounts),
         "created_accounts": created_accounts,
         "existing_accounts_used": existing_accounts_used,
+        "skipped_duplicate_names": skipped_duplicate_names,
         "row_errors": row_errors,
+        "imported_at": imported_at,
+        "activity_by": activity_by,
     }
 
 

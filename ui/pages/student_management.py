@@ -10,9 +10,10 @@ from src.utils.admin_context import (
     assigned_grade_for_user,
     grade_default_index,
     grade_scope_label,
-    student_owner_id,
+    student_scope_for_user,
 )
 from src.utils.helpers import profile_completeness_percent, parse_json_list
+from ui.components.activity_meta import render_activity_caption
 from ui.components.layout import section
 from ui.components.risk_display import risk_level_badge
 from ui.components.page_chrome import render_career_card, render_highlight_panel, render_page_header
@@ -43,7 +44,12 @@ def _render_career_guidance_tab(student_id: int, overview: dict) -> None:
         variant="violet",
         icon="◆",
     )
-    st.caption(f"Generated {snapshot['generated_at']} · Phase: **{snapshot['phase']}**")
+    render_activity_caption(
+        at=snapshot["generated_at"],
+        at_label="Generated",
+        by=snapshot.get("activity_by"),
+    )
+    st.caption(f"Phase: **{snapshot['phase']}**")
 
     report = snapshot.get("report") or {}
     if snapshot["phase"] == "class_10_report" and report.get("class_10"):
@@ -134,11 +140,16 @@ def render(current_user: dict) -> None:
     )
 
     grade_scope = assigned_grade_for_user(current_user)
+    scope = student_scope_for_user(current_user)
     grade_options = list(range(TARGET_GRADE_MIN, TARGET_GRADE_MAX + 1))
     grade_labels = [GRADE_LABELS[g] for g in grade_options]
     default_class_index = grade_default_index(current_user, grade_options)
 
     with section("Create student", "New Class 6–10 login and profile."):
+        st.caption(
+            "Use this for students skipped during bulk upload when the file has the same exact full name "
+            "more than once — only the first matching row in the file is imported automatically."
+        )
         with st.form("create_student_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             full_name = col1.text_input("Full name")
@@ -184,13 +195,7 @@ def render(current_user: dict) -> None:
             placeholder="Search by name, username, or email…",
         )
         with get_db_session() as session:
-            students = list_students(
-                session,
-                search_term=search_term,
-                limit=100,
-                admin_user_id=student_owner_id(current_user),
-                assigned_grade=grade_scope,
-            )
+            students = list_students(session, search_term=search_term, limit=100, **scope)
 
         if students:
             show_dataframe(students, columns=["full_name", "username", "email", "school", "class"])

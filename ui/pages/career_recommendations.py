@@ -5,6 +5,7 @@ from src.db.database import get_db_session
 from src.services.career_recommendation_service import generate_career_guidance, get_student_career_payload
 from src.services.student_service import get_student_dashboard_payload, get_student_profile_payload
 from src.utils.helpers import is_student_profile_complete, parse_json_list
+from ui.components.activity_meta import render_activity_caption
 from ui.components.layout import section
 from ui.components.page_chrome import render_career_card, render_highlight_panel, render_page_header
 
@@ -76,7 +77,12 @@ def render(current_user: dict) -> None:
         variant="emerald",
         icon="✓",
     )
-    st.caption(f"Generated {snapshot['generated_at']} · Class {snapshot.get('student_class') or '—'}")
+    render_activity_caption(
+        at=snapshot["generated_at"],
+        at_label="Generated",
+        by=snapshot.get("activity_by"),
+    )
+    st.caption(f"Class {snapshot.get('student_class') or '—'}")
 
     report = snapshot.get("report") or {}
     if snapshot.get("phase") == "class_10_report" and report.get("class_10"):
@@ -122,7 +128,10 @@ def render(current_user: dict) -> None:
     if len(history) > 1:
         with section("Past reports", "Earlier guidance saved when you generated again."):
             for item in history:
-                st.caption(
-                    f"{item['generated_at']} · Class {item.get('student_class') or '—'} · {item['phase']}"
+                render_activity_caption(
+                    at=item["generated_at"],
+                    at_label="Generated",
+                    by=item.get("activity_by"),
                 )
+                st.caption(f"Class {item.get('student_class') or '—'} · {item['phase']}")
                 st.write(item["summary"])

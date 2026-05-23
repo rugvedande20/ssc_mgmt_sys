@@ -11,6 +11,32 @@ def _letters_only(value: str) -> str:
     return re.sub(r"[^a-zA-Z]", "", value.strip().lower())
 
 
+def normalize_student_slug(value: object) -> str:
+    slug = str(value or "").strip().lower().replace("-", "_")
+    if slug in {"", "nan", "none", "student_username"}:
+        return ""
+    return slug
+
+
+def import_row_identity_key(row: dict) -> str:
+    """Stable per-row key for bulk import (one account per CSV student_username)."""
+    slug = normalize_student_slug(row.get("student_username"))
+    if slug:
+        return slug
+    first, last, _ = resolve_student_name(row)
+    return f"{_letters_only(first_name)}_{_letters_only(last_name)}"
+
+
+def login_username_base_for_import(row: dict, first_name: str, last_name: str) -> str:
+    """Prefer full CSV slug as login base so distinct rows do not collide on 3+3 letters."""
+    slug = normalize_student_slug(row.get("student_username"))
+    if slug:
+        base = re.sub(r"[^a-z0-9_]", "", slug)[:40]
+        if len(base) >= 3:
+            return base
+    return build_login_username(first_name, last_name)
+
+
 def build_login_username(first_name: str, last_name: str) -> str:
     first = _letters_only(first_name)
     last = _letters_only(last_name)
@@ -20,6 +46,11 @@ def build_login_username(first_name: str, last_name: str) -> str:
 
 def build_login_password(username: str) -> str:
     return f"{username}@123"
+
+
+def normalize_full_name_key(full_name: str) -> str:
+    """Case-insensitive key for duplicate-name checks."""
+    return " ".join(str(full_name or "").strip().lower().split())
 
 
 def resolve_student_name(row: dict) -> tuple[str, str, str]:

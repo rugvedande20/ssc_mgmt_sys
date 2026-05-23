@@ -215,7 +215,8 @@ def build_student_academic_template_rows() -> list[dict[str, object]]:
 def build_academic_csv_template_rows() -> list[dict[str, object]]:
     return [
         {
-            "student_username": "student_username",
+            "student_username": "aarav_patil",
+            "class_grade": 6,
             "attendance_pct": 88.0,
             "overall_marks_pct": 74.0,
             "latest_term_test_pct": 72.0,
@@ -226,7 +227,21 @@ def build_academic_csv_template_rows() -> list[dict[str, object]]:
             "disciplinary_incidents": 0,
             "class_participation_score": 7.8,
             "stress_level": 4.0,
-        }
+        },
+        {
+            "student_username": "priya_sharma",
+            "class_grade": 6,
+            "attendance_pct": 91.0,
+            "overall_marks_pct": 78.0,
+            "latest_term_test_pct": 76.0,
+            "subjects_below_passing": 0,
+            "school_fee_pending": "No",
+            "scholarship_or_concession": "Yes",
+            "extracurricular_activities": "Yes",
+            "disciplinary_incidents": 0,
+            "class_participation_score": 8.2,
+            "stress_level": 3.5,
+        },
     ]
 
 # Used as categorical ML feature (school focus / inclination, not senior streams)

@@ -324,6 +324,13 @@ def render_student_card(row: dict[str, Any]) -> None:
             st.markdown(chip_html, unsafe_allow_html=True)
         else:
             st.caption("No specific factors recorded.")
+        if row.get("predicted_at") or row.get("activity_by"):
+            meta_parts = []
+            if row.get("predicted_at"):
+                meta_parts.append(f"Predicted at: {row['predicted_at']}")
+            if row.get("activity_by"):
+                meta_parts.append(f"Activity by: {row['activity_by']}")
+            st.caption(" · ".join(meta_parts))
 
 
 def _factor_chip_html(factor_key: str) -> str:

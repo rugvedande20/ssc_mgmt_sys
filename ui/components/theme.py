@@ -179,12 +179,24 @@ def inject_app_theme() -> None:
         padding: 0 !important;
         margin: 0 !important;
       }
-      /* Sidebar logout */
+      /* Sidebar footer buttons (portal switch + logout) */
       section[data-testid="stSidebar"] [data-testid="stSidebar"] [data-testid="stButton"] > button,
       section[data-testid="stSidebar"] [data-testid="stButton"] > button {
         border-radius: 10px !important;
         font-weight: 600 !important;
         border: 1px solid #e2e8f0 !important;
+      }
+      section[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:has([data-testid="stButton"] button[kind="primary"]) {
+        margin-bottom: 0.5rem;
+      }
+      section[data-testid="stSidebar"] [data-testid="stButton"] button[kind="primary"] {
+        background: #eef2ff !important;
+        border-color: #818cf8 !important;
+        color: #3730a3 !important;
+      }
+      section[data-testid="stSidebar"] [data-testid="stButton"] button[kind="primary"]:hover {
+        background: #e0e7ff !important;
+        border-color: #6366f1 !important;
       }
 
       /* Section cards in main area */

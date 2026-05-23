@@ -7,6 +7,7 @@ from src.utils.helpers import is_student_profile_complete, profile_completeness_
 from ui.components.common import render_profile_completeness
 from ui.components.layout import section
 from ui.components.page_chrome import render_page_header, render_snapshot_grid
+from ui.components.change_password_panel import render_change_password_panel
 from ui.components.student_profile_form import render_student_profile_form
 
 
@@ -59,3 +60,6 @@ def render(current_user: dict) -> None:
                 form_key="student_profile_edit",
                 submit_label="Save changes",
             )
+
+    with section("Account security", "Update your sign-in password."):
+        render_change_password_panel(current_user, key_prefix="student_profile_pwd")

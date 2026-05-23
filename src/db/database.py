@@ -81,6 +81,18 @@ def apply_schema_patches(engine) -> None:
         "ALTER TABLE users ADD COLUMN last_name VARCHAR(60)",
         "ALTER TABLE users ADD COLUMN contact_phone VARCHAR(30)",
         "ALTER TABLE users ADD COLUMN assigned_grade INTEGER",
+        """CREATE TABLE IF NOT EXISTS password_reset_otps (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            otp_hash VARCHAR(255) NOT NULL,
+            expires_at DATETIME NOT NULL,
+            created_at DATETIME NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )""",
+        "ALTER TABLE academic_records ADD COLUMN recorded_by_user_id INTEGER REFERENCES users(id)",
+        "ALTER TABLE dropout_predictions ADD COLUMN predicted_by_user_id INTEGER REFERENCES users(id)",
+        "ALTER TABLE student_profiles ADD COLUMN updated_by_user_id INTEGER REFERENCES users(id)",
+        "ALTER TABLE career_guidance_snapshots ADD COLUMN generated_by_user_id INTEGER REFERENCES users(id)",
     ]
     with engine.connect() as connection:
         with connection.begin():

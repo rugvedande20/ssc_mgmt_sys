@@ -6,6 +6,7 @@ from src.services.student_service import get_student_dashboard_payload
 from src.utils.helpers import is_student_profile_complete, profile_completeness_percent
 from ui.components.common import render_profile_completeness, render_student_next_steps
 from ui.components.layout import section
+from ui.components.change_password_panel import render_change_password_panel
 from ui.components.page_chrome import render_page_header, render_snapshot_grid
 
 
@@ -59,3 +60,6 @@ def render(current_user: dict) -> None:
             col_b.caption("Update class, income bracket, interests, and more on your profile page.")
         else:
             st.warning("Your profile is not set up yet.")
+
+    with section("Account security", "Update your sign-in password."):
+        render_change_password_panel(current_user, key_prefix="student_dash_pwd")

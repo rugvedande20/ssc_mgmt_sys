@@ -11,6 +11,7 @@ from src.services.psychometric_service import (
     list_recent_attempts,
     save_psychometric_attempt,
 )
+from ui.components.activity_meta import render_activity_caption
 from ui.components.layout import section, show_plotly_chart
 from ui.components.page_chrome import render_highlight_panel, render_page_header
 from ui.components.psychometric_display import (
@@ -146,7 +147,12 @@ def render(current_user: dict) -> None:
                 variant="emerald",
                 icon="✓",
             )
-            st.caption(f"Last taken: {latest_attempt['submitted_at']} · Top codes: {latest_attempt['top_codes']}")
+            render_activity_caption(
+                at=latest_attempt["submitted_at"],
+                at_label="Last taken",
+                by=latest_attempt.get("activity_by"),
+            )
+            st.caption(f"Top codes: {latest_attempt['top_codes']}")
             if latest_scores:
                 chart_df = pd.DataFrame(
                     [{"Category": category, "Score": score} for category, score in latest_scores.items()]

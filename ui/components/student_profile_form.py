@@ -124,7 +124,7 @@ def render_student_profile_form(
             return
 
         with get_db_session() as session:
-            upsert_student_profile(session, current_user_id, payload)
+            upsert_student_profile(session, current_user_id, payload, updated_by_user_id=current_user_id)
         st.success("Profile saved successfully.")
         st.rerun()
 
