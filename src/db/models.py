@@ -55,6 +55,7 @@ class User(Base):
     )
     admin_actions: Mapped[list["InterventionLog"]] = relationship(
         foreign_keys="InterventionLog.admin_user_id",
+        overlaps="admin_user",
     )
 
 
@@ -204,6 +205,19 @@ class InterventionLog(Base):
     admin_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     note: Mapped[str] = mapped_column(Text, nullable=False)
     action_taken: Mapped[str] = mapped_column(String(120), nullable=False)
+    intervention_type: Mapped[str] = mapped_column(String(80), default="One-on-one counseling", nullable=False)
+    module: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    priority: Mapped[str] = mapped_column(String(20), default="Medium", nullable=False)
+    intensity: Mapped[str] = mapped_column(String(20), default="Medium", nullable=False)
+    risk_level_at_time: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    risk_score_at_time: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="completed", nullable=False)
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    dropout_prediction_id: Mapped[int | None] = mapped_column(
+        ForeignKey("dropout_predictions.id"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now_ist, nullable=False)
 
     student: Mapped[User] = relationship(foreign_keys=[student_id], back_populates="intervention_logs")
+    admin_user: Mapped[User] = relationship(foreign_keys=[admin_user_id], overlaps="admin_actions")

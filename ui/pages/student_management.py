@@ -13,10 +13,12 @@ from src.utils.admin_context import (
     student_scope_for_user,
 )
 from src.utils.helpers import profile_completeness_percent, parse_json_list
+from ui.components.admin_reset_password_panel import render_admin_reset_password_panel
 from ui.components.activity_meta import render_activity_caption
 from ui.components.layout import section
 from ui.components.risk_display import risk_level_badge
 from ui.components.page_chrome import render_career_card, render_highlight_panel, render_page_header
+from ui.components.intervention_display import render_interventions_tab
 from ui.components.student_overview import (
     render_academic_tab,
     render_profile_tab,
@@ -110,8 +112,8 @@ def _render_student_overview(overview: dict, current_user: dict) -> None:
         else:
             st.write("—")
 
-    tab_profile, tab_academic, tab_risk, tab_psych, tab_career = st.tabs(
-        ["Profile", "Academics", "Dropout risk", "Psychometric", "Career guidance"]
+    tab_profile, tab_academic, tab_risk, tab_interventions, tab_psych, tab_career, tab_password = st.tabs(
+        ["Profile", "Academics", "Dropout risk", "Interventions", "Psychometric", "Career guidance", "Reset password"]
     )
 
     with tab_profile:
@@ -120,10 +122,25 @@ def _render_student_overview(overview: dict, current_user: dict) -> None:
         render_academic_tab(overview.get("latest_academic"))
     with tab_risk:
         render_risk_tab(overview.get("latest_prediction"))
+    with tab_interventions:
+        render_interventions_tab(
+            overview,
+            overview.get("interventions") or [],
+            current_user=current_user,
+            key_prefix=f"overview_{overview['id']}",
+        )
     with tab_psych:
         render_psychometric_tab(overview.get("latest_psychometric"))
     with tab_career:
         _render_career_guidance_tab(overview["id"], overview)
+    with tab_password:
+        render_admin_reset_password_panel(
+            current_user,
+            student_id=overview["id"],
+            student_username=overview["username"],
+            student_name=overview["full_name"],
+            key_prefix=f"admin_pwd_{overview['id']}",
+        )
 
 
 def render(current_user: dict) -> None:
@@ -203,7 +220,7 @@ def render(current_user: dict) -> None:
             st.info("No students found for the current search.")
             return
 
-    with section("Student overview", "Profile, academics, risk, psychometric, and career guidance."):
+    with section("Student overview", "Profile, academics, risk, interventions, psychometric, and career guidance."):
         student_labels = {f"{student['full_name']} ({student['username']})": student["id"] for student in students}
         selected_label = st.selectbox("Select a student", list(student_labels.keys()))
         with get_db_session() as session:

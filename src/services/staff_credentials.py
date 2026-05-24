@@ -31,6 +31,50 @@ def build_staff_password(first_name: str, last_name: str) -> str:
     return f"{build_name_prefix(first_name, last_name)}@123"
 
 
+def build_staff_role_password(first_name: str, last_name: str, role: str) -> str:
+    prefix = build_name_prefix(first_name, last_name)
+    if role == "superadmin":
+        return f"{prefix}superadmin@123"
+    return f"{prefix}admin@123"
+
+
+def resolve_staff_name_parts(*, first_name: str | None, last_name: str | None, full_name: str) -> tuple[str, str]:
+    first = str(first_name or "").strip()
+    last = str(last_name or "").strip()
+    if first and last:
+        return first, last
+    parts = [part for part in str(full_name or "").strip().split() if part]
+    if len(parts) >= 2:
+        return parts[0], parts[-1]
+    if parts:
+        return parts[0], parts[0]
+    return "user", "user"
+
+
+def default_staff_password(*, first_name: str | None, last_name: str | None, full_name: str) -> str:
+    first, last = resolve_staff_name_parts(
+        first_name=first_name,
+        last_name=last_name,
+        full_name=full_name,
+    )
+    return build_staff_password(first, last)
+
+
+def default_staff_role_password(
+    *,
+    first_name: str | None,
+    last_name: str | None,
+    full_name: str,
+    role: str,
+) -> str:
+    first, last = resolve_staff_name_parts(
+        first_name=first_name,
+        last_name=last_name,
+        full_name=full_name,
+    )
+    return build_staff_role_password(first, last, role)
+
+
 def allocate_unique_staff_username(session, base_username: str) -> str:
     candidate = base_username
     suffix = 2

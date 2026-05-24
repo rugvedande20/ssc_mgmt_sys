@@ -2,6 +2,7 @@ import streamlit as st
 
 from config.school_context import FUTURE_SCOPE_NOTE, PROFILE_FIELD_LABELS, format_class
 from src.db.database import get_db_session
+from src.services.intervention_service import get_student_interventions_payload
 from src.services.student_service import get_student_dashboard_payload
 from src.utils.helpers import is_student_profile_complete, profile_completeness_percent
 from ui.components.common import render_profile_completeness, render_student_next_steps
@@ -13,6 +14,7 @@ from ui.components.page_chrome import render_page_header, render_snapshot_grid
 def render(current_user: dict) -> None:
     with get_db_session() as session:
         payload = get_student_dashboard_payload(session, current_user["id"])
+        support_payload = get_student_interventions_payload(session, current_user["id"])
 
     profile = payload["profile"]
     latest_assessment = payload["latest_assessment"]
@@ -21,6 +23,7 @@ def render(current_user: dict) -> None:
     profile_complete = is_student_profile_complete(profile)
     assessment_done = latest_assessment is not None
     has_recommendations = len(recommendations) > 0
+    scheduled_count = len(support_payload.get("scheduled") or [])
 
     render_page_header(
         "My Dashboard",
@@ -29,10 +32,11 @@ def render(current_user: dict) -> None:
         badge_variant="sky",
     )
 
-    metric_cols = st.columns(3)
+    metric_cols = st.columns(4)
     metric_cols[0].metric("Profile", f"{completeness}%")
     metric_cols[1].metric("Interest assessment", "Done" if assessment_done else "Pending")
     metric_cols[2].metric("Career ideas", len(recommendations))
+    metric_cols[3].metric("Upcoming support", scheduled_count)
 
     with section("Your journey", "Three milestones — same flow your teachers see on their dashboard."):
         render_student_next_steps(
@@ -40,6 +44,21 @@ def render(current_user: dict) -> None:
             assessment_done=assessment_done,
             has_recommendations=has_recommendations,
         )
+
+    with section("Support & interventions", "Scheduled counseling sessions from your school team."):
+        if scheduled_count:
+            st.success(f"You have {scheduled_count} upcoming support session(s).")
+            for row in support_payload["scheduled"][:3]:
+                st.caption(
+                    f"{row.get('intervention_type', 'Session')} · "
+                    f"{row.get('module') or 'General support'} · "
+                    f"{row.get('scheduled_at', '—')}"
+                )
+        else:
+            st.info("No upcoming sessions right now. Your counselor will schedule support here when needed.")
+        if st.button("Open My Support", type="primary", use_container_width=True, key="dash_open_support"):
+            st.session_state["nav_page"] = "My Support"
+            st.rerun()
 
     with section("Profile snapshot", "Quick view of your school context."):
         if profile:

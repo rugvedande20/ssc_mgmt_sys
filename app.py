@@ -36,19 +36,29 @@ STUDENT_PAGES = [
     "Profile",
     "Interest Assessment",
     "Career Ideas",
+    "My Support",
 ]
 
 STUDENT_ONBOARDING_PAGE = "Complete Profile"
 
 
-@st.cache_resource(show_spinner=False)
-def bootstrap_database() -> bool:
+def ensure_database_schema() -> None:
+    """Always run — schema patches must not be skipped by Streamlit cache."""
     engine = get_engine()
     Base.metadata.create_all(bind=engine)
     apply_schema_patches(engine)
-    with get_db_session() as session:
-        remove_legacy_demo_student(session)
-        seed_demo_data(session)
+
+
+@st.cache_resource(show_spinner=False)
+def bootstrap_seed_data() -> bool:
+    from sqlalchemy.exc import IntegrityError
+
+    try:
+        with get_db_session() as session:
+            remove_legacy_demo_student(session)
+            seed_demo_data(session)
+    except IntegrityError:
+        pass
     return True
 
 
@@ -139,6 +149,7 @@ def render_page(page_name: str, user: dict | None) -> None:
         profile,
         psychometric_test,
         student_dashboard,
+        student_interventions,
         student_onboarding,
     )
 
@@ -148,13 +159,15 @@ def render_page(page_name: str, user: dict | None) -> None:
         "Profile": lambda: profile.render(user),
         "Interest Assessment": lambda: psychometric_test.render(user),
         "Career Ideas": lambda: career_recommendations.render(user),
+        "My Support": lambda: student_interventions.render(user),
     }
     student_pages.get(page_name, lambda: student_onboarding.render(user))()
 
 
 def main() -> None:
     init_session_state()
-    bootstrap_database()
+    ensure_database_schema()
+    bootstrap_seed_data()
     inject_app_theme()
 
     current_user = get_current_user()

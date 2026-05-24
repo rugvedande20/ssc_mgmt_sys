@@ -271,6 +271,8 @@ def _staff_row(user: User) -> dict[str, Any]:
         "id": user.id,
         "username": user.username,
         "full_name": user.full_name,
+        "first_name": user.first_name or "",
+        "last_name": user.last_name or "",
         "email": user.email,
         "role": user.role,
         "contact_phone": user.contact_phone or "—",

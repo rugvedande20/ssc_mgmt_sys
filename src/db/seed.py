@@ -1,4 +1,4 @@
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 
 from src.auth.hashing import hash_password
 from src.db.models import (
@@ -36,7 +36,9 @@ def remove_legacy_demo_student(session) -> None:
 def seed_demo_data(session) -> None:
     remove_legacy_demo_student(session)
 
-    existing_superadmin = session.scalar(select(User).where(User.username == "superadmin"))
+    existing_superadmin = session.scalar(
+        select(User).where(or_(User.username == "superadmin", User.email == "superadmin@ssc.local"))
+    )
     if not existing_superadmin:
         session.add(
             User(
@@ -57,7 +59,9 @@ def seed_demo_data(session) -> None:
         if not existing_superadmin.contact_phone:
             existing_superadmin.contact_phone = "9000000000"
 
-    existing_admin = session.scalar(select(User).where(User.username == "admin"))
+    existing_admin = session.scalar(
+        select(User).where(or_(User.username == "admin", User.email == "admin@demo.edu"))
+    )
     if existing_admin:
         existing_admin.assigned_grade = 6
         existing_admin.contact_phone = "8459201018"

@@ -6,6 +6,7 @@ from src.services.student_reset_service import CLEAR_STUDENTS_CONFIRM_PHRASE, cl
 from src.services.user_service import delete_staff_user, list_staff_users, update_staff_user
 from ui.components.layout import section
 from ui.components.page_chrome import render_page_header
+from ui.components.superadmin_reset_password_panel import render_superadmin_reset_password_panel
 from ui.components.tables import show_dataframe
 
 
@@ -41,8 +42,8 @@ def render(current_user: dict) -> None:
         user_id = labels[selected_label]
         selected = next(row for row in staff if row["id"] == user_id)
 
-        tab_edit, tab_delete, tab_clear_students = st.tabs(
-            ["Edit user", "Delete user", "Clear student database"]
+        tab_edit, tab_reset_password, tab_delete, tab_clear_students = st.tabs(
+            ["Edit user", "Reset password", "Delete user", "Clear student database"]
         )
 
         with tab_edit:
@@ -75,6 +76,17 @@ def render(current_user: dict) -> None:
                     st.rerun()
                 except ValueError as exc:
                     st.error(str(exc))
+
+        with tab_reset_password:
+            render_superadmin_reset_password_panel(
+                staff_id=user_id,
+                staff_name=selected["full_name"],
+                first_name=selected["first_name"],
+                last_name=selected["last_name"],
+                full_name=selected["full_name"],
+                role=selected["role"],
+                key_prefix=f"staff_pwd_{user_id}",
+            )
 
         with tab_delete:
             st.warning(f"This will deactivate **{selected['full_name']}** (`{selected['username']}`).")

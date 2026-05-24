@@ -99,9 +99,13 @@ def render(current_user: dict) -> None:
             r2.metric("Medium risk", counts.get("Medium", 0))
             r3.metric("Low risk", counts.get("Low", 0))
             r4.metric("Students scored", len(filtered))
-            if st.button("View details", type="primary", use_container_width=True, key="dash_risk_details"):
+            btn1, btn2 = st.columns(2)
+            if btn1.button("View details", type="primary", use_container_width=True, key="dash_risk_details"):
                 st.session_state["nav_page"] = "Dropout Analysis"
                 st.session_state["focus_risk_explanations"] = True
+                st.rerun()
+            if btn2.button("Open interventions", use_container_width=True, key="dash_open_interventions"):
+                st.session_state["nav_page"] = "Interventions"
                 st.rerun()
 
     with section("Account security", "Update your sign-in password."):

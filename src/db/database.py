@@ -61,10 +61,29 @@ def get_database_mode() -> str:
     return _DATABASE_MODE
 
 
+def _table_exists(connection, table: str) -> bool:
+    row = connection.execute(
+        text("SELECT name FROM sqlite_master WHERE type='table' AND name=:table"),
+        {"table": table},
+    ).first()
+    return row is not None
+
+
+def _column_exists(connection, table: str, column: str) -> bool:
+    if not _table_exists(connection, table):
+        return False
+    rows = connection.execute(text(f"PRAGMA table_info({table})")).fetchall()
+    return any(row[1] == column for row in rows)
+
+
+def _add_column_if_missing(connection, table: str, column: str, definition: str) -> None:
+    if not _column_exists(connection, table, column):
+        connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {definition}"))
+
+
 def apply_schema_patches(engine) -> None:
     """Add columns introduced after first deploy (SQLite has no automatic migrations)."""
-    patches = [
-        "ALTER TABLE users ADD COLUMN created_by_admin_id INTEGER REFERENCES users(id)",
+    ddl_patches = [
         """CREATE TABLE IF NOT EXISTS career_guidance_snapshots (
             id INTEGER PRIMARY KEY,
             student_id INTEGER NOT NULL,
@@ -76,11 +95,6 @@ def apply_schema_patches(engine) -> None:
             generated_at DATETIME NOT NULL,
             FOREIGN KEY(student_id) REFERENCES users(id)
         )""",
-        "ALTER TABLE career_recommendations ADD COLUMN guidance_snapshot_id INTEGER REFERENCES career_guidance_snapshots(id)",
-        "ALTER TABLE users ADD COLUMN first_name VARCHAR(60)",
-        "ALTER TABLE users ADD COLUMN last_name VARCHAR(60)",
-        "ALTER TABLE users ADD COLUMN contact_phone VARCHAR(30)",
-        "ALTER TABLE users ADD COLUMN assigned_grade INTEGER",
         """CREATE TABLE IF NOT EXISTS password_reset_otps (
             id INTEGER PRIMARY KEY,
             user_id INTEGER NOT NULL,
@@ -89,15 +103,32 @@ def apply_schema_patches(engine) -> None:
             created_at DATETIME NOT NULL,
             FOREIGN KEY(user_id) REFERENCES users(id)
         )""",
-        "ALTER TABLE academic_records ADD COLUMN recorded_by_user_id INTEGER REFERENCES users(id)",
-        "ALTER TABLE dropout_predictions ADD COLUMN predicted_by_user_id INTEGER REFERENCES users(id)",
-        "ALTER TABLE student_profiles ADD COLUMN updated_by_user_id INTEGER REFERENCES users(id)",
-        "ALTER TABLE career_guidance_snapshots ADD COLUMN generated_by_user_id INTEGER REFERENCES users(id)",
+    ]
+    column_patches: list[tuple[str, str, str]] = [
+        ("users", "created_by_admin_id", "INTEGER REFERENCES users(id)"),
+        ("career_recommendations", "guidance_snapshot_id", "INTEGER REFERENCES career_guidance_snapshots(id)"),
+        ("users", "first_name", "VARCHAR(60)"),
+        ("users", "last_name", "VARCHAR(60)"),
+        ("users", "contact_phone", "VARCHAR(30)"),
+        ("users", "assigned_grade", "INTEGER"),
+        ("academic_records", "recorded_by_user_id", "INTEGER REFERENCES users(id)"),
+        ("dropout_predictions", "predicted_by_user_id", "INTEGER REFERENCES users(id)"),
+        ("student_profiles", "updated_by_user_id", "INTEGER REFERENCES users(id)"),
+        ("career_guidance_snapshots", "generated_by_user_id", "INTEGER REFERENCES users(id)"),
+        ("intervention_logs", "intervention_type", "VARCHAR(80) DEFAULT 'One-on-one counseling'"),
+        ("intervention_logs", "module", "VARCHAR(120)"),
+        ("intervention_logs", "priority", "VARCHAR(20) DEFAULT 'Medium'"),
+        ("intervention_logs", "intensity", "VARCHAR(20) DEFAULT 'Medium'"),
+        ("intervention_logs", "risk_level_at_time", "VARCHAR(20)"),
+        ("intervention_logs", "risk_score_at_time", "FLOAT"),
+        ("intervention_logs", "status", "VARCHAR(20) DEFAULT 'completed'"),
+        ("intervention_logs", "scheduled_at", "DATETIME"),
+        ("intervention_logs", "completed_at", "DATETIME"),
+        ("intervention_logs", "dropout_prediction_id", "INTEGER REFERENCES dropout_predictions(id)"),
     ]
     with engine.connect() as connection:
         with connection.begin():
-            for statement in patches:
-                try:
-                    connection.execute(text(statement))
-                except OperationalError:
-                    pass
+            for statement in ddl_patches:
+                connection.execute(text(statement))
+            for table, column, definition in column_patches:
+                _add_column_if_missing(connection, table, column, definition)

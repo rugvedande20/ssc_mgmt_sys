@@ -43,6 +43,7 @@ from src.db.models import (
     StudentProfile,
     User,
 )
+from src.services.intervention_service import list_interventions_for_student, suggested_priority_intensity
 
 
 PROFILE_DEFAULTS = {
@@ -149,6 +150,23 @@ def create_student_user(
         updated_by_user_id=created_by_admin_id,
     )
     return student
+
+
+def get_student_in_admin_scope(
+    session,
+    student_id: int,
+    *,
+    assigned_grade: int | None = None,
+    created_by_admin_id: int | None = None,
+) -> User | None:
+    """Return the student if they exist and fall within the admin's cohort scope."""
+    filters = [User.id == student_id, User.role == "student", User.is_active.is_(True)]
+    if created_by_admin_id is not None:
+        filters.append(User.created_by_admin_id == created_by_admin_id)
+    elif assigned_grade is not None:
+        filters.extend(student_grade_scope_filters(session, assigned_grade))
+
+    return session.scalar(select(User).where(*filters))
 
 
 def list_students(
@@ -534,6 +552,10 @@ def get_student_overview(session, student_id: int) -> dict[str, Any] | None:
             .where(CareerGuidanceSnapshot.student_id == student_id)
         )
         or 0,
+        "interventions": list_interventions_for_student(session, student_id),
+        "intervention_suggested": suggested_priority_intensity(
+            latest_prediction.risk_level if latest_prediction else None
+        ),
     }
 
 

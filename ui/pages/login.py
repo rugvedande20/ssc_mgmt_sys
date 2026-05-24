@@ -78,7 +78,7 @@ def render() -> None:
             """
             <div class="login-card-compact">
               <div class="login-brand">Sign in</div>
-              <p class="login-tagline">Superadmin, Admin, or student account</p>
+              <p class="login-tagline">Superadmin, Admin or Student account</p>
             </div>
             """,
             unsafe_allow_html=True,
